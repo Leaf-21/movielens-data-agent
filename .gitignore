@@ -1,0 +1,46 @@
+# ===== 原始数据与压缩包（按团队规范禁止上传仓库）=====
+*.zip
+*.gz
+*.tar
+data/raw/
+data/ml-1m/
+*.dat
+
+# ===== 敏感信息（严禁上传）=====
+.env
+.env.*
+*.key
+*.pem
+credentials.*
+*token*
+
+# ===== Java / Hadoop 构建产物 =====
+target/
+build/
+*.class
+*.jar
+hadoop/output/
+
+# ===== Python / Agent =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ===== Node / Frontend =====
+node_modules/
+dist/
+npm-debug.log*
+yarn-error.log*
+
+# ===== 日志与临时文件 =====
+logs/
+*.log
+*.tmp
+
+# ===== IDE / 操作系统 =====
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
