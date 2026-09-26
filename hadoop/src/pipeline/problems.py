@@ -49,8 +49,8 @@ PROBLEM_RULES = [
     dict(key='users_u_zip_bad', dimension='accurate', action='fix',
          severity='low', fixable=True,
          subject='Zip-code 不符合 5 位数字格式',
-         reason='其中 66 条为美国 ZIP+4 扩展格式（如 96707-1321），可安全截取前 5 位；'
-                '另 15 条为 6/7/9 位数字，无法确定正确值，需隔离'),
+         reason='其中美国 ZIP+4 扩展格式（NNNNN-NNNN）可安全截取前 5 位；'
+                '其余形式（非数字、纯数字但位数不对、空值）无法确定正确值，需隔离'),
 
     # ---- 准确性：其余字段（实测均为 0，保留以便后续数据出现问题时自动报出）----
     dict(key='ratings_r_uid_bad', dimension='accurate', action='isolate',
@@ -89,18 +89,18 @@ PROBLEM_RULES = [
          severity='high', fixable=False,
          subject='users.UserID 不是正整数',
          reason='标识符格式异常'),
-    dict(key='users_u_gender_bad', dimension='accurate', action='keep',
+    dict(key='users_u_gender_bad', dimension='accurate', action='isolate',
          severity='low', fixable=False,
          subject='Gender 不在 {M, F} 范围',
-         reason='用户自愿填写且未经核验，无法修正'),
-    dict(key='users_u_age_bad', dimension='accurate', action='keep',
+         reason='取值编码超出数据说明，无法确定真实性别，移出主数据集'),
+    dict(key='users_u_age_bad', dimension='accurate', action='isolate',
          severity='low', fixable=False,
          subject='Age 不属于规定年龄段编码',
-         reason='用户自愿填写且未经核验，无法修正'),
-    dict(key='users_u_occ_bad', dimension='accurate', action='keep',
+         reason='取值编码超出数据说明，无法确定真实年龄段，移出主数据集'),
+    dict(key='users_u_occ_bad', dimension='accurate', action='isolate',
          severity='low', fixable=False,
          subject='Occupation 超出 0-20 编码范围',
-         reason='用户自愿填写且未经核验，无法修正'),
+         reason='取值编码超出数据说明，无法确定真实职业，移出主数据集'),
 
     # ---- 完整性：必需字段缺失 ----
     dict(key='ratings_missing', dimension='complete', action='isolate',
@@ -141,14 +141,18 @@ PROBLEM_RULES = [
          reason='跨表关联断裂，评分记录无法关联到电影信息'),
 
     # ---- 一致性：表内冲突与格式 ----
-    dict(key='movies_value_multi_violations', dimension='consistent', action='isolate',
+    # 冲突（同一主键多个不同取值）由清洗侧的 conflict_policy 处置：保留一条、其余按重复移除，
+    # 但**保留一条不等于修正**，因此这类问题由 driver 依据清洗统计单独列入未解决问题。
+    dict(key='movies_value_multi_violations', dimension='consistent', action='dedupe',
          severity='high', fixable=False,
          subject='同一 MovieID 对应多个 Title 或 Genres',
-         reason='同一标识对应矛盾信息，无法判断哪个正确'),
-    dict(key='users_attr_multi_violations', dimension='consistent', action='isolate',
+         reason='同一标识对应矛盾信息，数据本身无法判断哪个正确；'
+                '清洗按确定性规则保留一条，其余移除，该问题**未真正解决**'),
+    dict(key='users_attr_multi_violations', dimension='consistent', action='dedupe',
          severity='medium', fixable=False,
          subject='同一 UserID 对应多组冲突的用户属性',
-         reason='属性冲突，无法判断哪组正确'),
+         reason='属性冲突，数据本身无法判断哪组正确；'
+                '清洗按确定性规则保留一条，其余移除，该问题**未真正解决**'),
     dict(key='movies_m_genres_dup', dimension='consistent', action='fix',
          severity='low', fixable=True,
          subject='Genres 内部出现重复类型',
@@ -157,14 +161,16 @@ PROBLEM_RULES = [
          severity='low', fixable=True,
          subject='Genres 内部存在空项',
          reason='如 Drama|，可安全去除空项'),
-    dict(key='movies_m_genres_unknown', dimension='consistent', action='keep',
+    dict(key='movies_m_genres_unknown', dimension='consistent', action='isolate',
          severity='low', fixable=False,
          subject='Genres 出现未识别的类型名称',
-         reason='无法确定应映射到哪个标准类别'),
-    dict(key='movies_m_genres_empty', dimension='consistent', action='keep',
+         reason='类别不在 ml-1m 的 18 个标准类别内（如注入的 UnknownGenre），'
+                '无法确定应映射到哪个标准类别，移出主数据集'),
+    dict(key='movies_m_genres_empty', dimension='consistent', action='isolate',
          severity='low', fixable=False,
          subject='Genres 字段为空',
-         reason='属信息不足，不影响记录唯一性'),
+         reason='类型信息完全缺失，无法通过其它字段推导；'
+                '注意 Genres 属可选属性，此处置是"无法验证"而非"记录错误"'),
     dict(key='movies_m_title_space', dimension='consistent', action='fix',
          severity='low', fixable=True,
          subject='电影标题首尾存在空白字符',

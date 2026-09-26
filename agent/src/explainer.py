@@ -36,8 +36,8 @@ FAILURE_GUIDANCE = {
     'INVALID_REQUEST': '请检查请求字段后重新提交。',
     'DATA_NOT_FOUND': '数据文件缺失。请确认已解压 ml-1m.zip 且 Hadoop 服务的 '
                       '--data-dir 指向包含 ratings.dat / movies.dat / users.dat 的目录。',
-    'INVALID_DATA_VERSION': '请使用已登记的数据版本（movielens-1m-v1 或 clean 产物版本）。',
-    'INVALID_RULE_VERSION': '请使用已登记的规则版本（当前为 rule-v1），或传 "default"。',
+    'INVALID_DATA_VERSION': '请使用已登记的数据版本（movielens-1m-v2 或 clean 产物版本）。',
+    'INVALID_RULE_VERSION': '请使用已登记的规则版本（当前为 rule-v2），或传 "default"。',
     'HADOOP_EXECUTION_ERROR': 'Hadoop 环节执行失败。请检查 Hadoop 服务是否存活'
                               '（GET /health）以及作业日志，确认后可重新提交任务。',
     'QUALITY_SCORE_ERROR': '质量评分环节失败，评分结果不可信，系统未输出任何占位分数。'

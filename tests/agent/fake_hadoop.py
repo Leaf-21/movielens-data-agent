@@ -94,9 +94,9 @@ class FakeHadoop(BaseHTTPRequestHandler):
                                   'clean_statistics': dict(CLEAN_STATS)})
             self._save()
             self._json({'task_id': task_id, 'status': 'SUCCESS',
-                        'input_version': 'movielens-1m-v1',
-                        'output_version': 'movielens-1m-v1-clean-v1',
-                        'rule_version': 'rule-v1',
+                        'input_version': 'movielens-1m-v2',
+                        'output_version': 'movielens-1m-v2-clean-v1',
+                        'rule_version': 'rule-v2',
                         'statistics': dict(CLEAN_STATS)})
         elif path == '/hadoop/quality-score/after':
             if opts['fail_at'] == 'after':
@@ -109,7 +109,7 @@ class FakeHadoop(BaseHTTPRequestHandler):
                                   'after_details': {}})
             self._save()
             self._json({'task_id': task_id, 'status': 'SUCCESS',
-                        'data_version': 'movielens-1m-v1-clean-v1',
+                        'data_version': 'movielens-1m-v2-clean-v1',
                         'scores': {k: AFTER_SCORES[k] for k in
                                    ('accurate', 'complete', 'unique',
                                     'up_to_date', 'consistent')}})

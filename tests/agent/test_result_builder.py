@@ -53,13 +53,13 @@ class TestBuild(unittest.TestCase):
 
     def test_versions_and_time_boundaries(self):
         r = result_builder.build('task_t1', _state(), self.cfg, True)
-        self.assertEqual(r['input_version'], 'movielens-1m-v1')
-        self.assertEqual(r['data_version'], 'movielens-1m-v1-clean-v1')
+        self.assertEqual(r['input_version'], 'movielens-1m-v2')
+        self.assertEqual(r['data_version'], 'movielens-1m-v2-clean-v1')
         self.assertEqual(r['T1_epoch'], 974862386)   # 与 rules.json 一致（epoch 必须精确）
         self.assertEqual(r['T2_epoch'], 976422054)
         self.assertEqual(r['T1'], '2000-11-22')
         self.assertEqual(r['T2'], '2000-12-10')
-        self.assertEqual(r['rule_version'], 'rule-v1')
+        self.assertEqual(r['rule_version'], 'rule-v2')
 
     def test_score_change_arithmetic(self):
         r = result_builder.build('task_t1', _state(), self.cfg, True)
@@ -94,7 +94,7 @@ class TestBuild(unittest.TestCase):
         for key in ('method', 'improvements', 'unresolved', 'limitations'):
             self.assertIn(key, rep)  # 接口规范第 14 节
         self.assertEqual(len(rep['improvements']), 5)
-        self.assertEqual(rep['method']['rule_version'], 'rule-v1')
+        self.assertEqual(rep['method']['rule_version'], 'rule-v2')
         self.assertTrue(rep['limitations'])  # 来自成员A的固定文案
 
     def test_before_only_has_nulls_not_zeros(self):
@@ -110,7 +110,7 @@ class TestBuild(unittest.TestCase):
         # 未清洗时 unresolved 按 before 口径：zip_bad 计划处置
         self.assertIn('users_u_zip_bad',
                       [p['code'] for p in r['unresolved_problems']])
-        self.assertEqual(r['data_version'], 'movielens-1m-v1')
+        self.assertEqual(r['data_version'], 'movielens-1m-v2')
         self.assertIsNone(r['output_version'])
 
     def test_clean_done_but_after_failed(self):

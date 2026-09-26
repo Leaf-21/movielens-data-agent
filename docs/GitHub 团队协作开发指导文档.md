@@ -628,10 +628,10 @@ feature/frontend-test
 
 ```json
 {
-  "task_id": "task_001",
+  "task_id": "task_002",
   "status": "success",
-  "data_version": "movielens-1m-v1",
-  "rule_version": "rule-v1",
+  "data_version": "movielens-1m-v2",
+  "rule_version": "rule-v2",
   "T1": "XXXX-XX-XX",
   "T2": "XXXX-XX-XX",
   "before_score": {

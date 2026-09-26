@@ -30,7 +30,7 @@ Hadoop 服务层（HTTP）
 --------
     curl -X POST http://127.0.0.1:8080/hadoop/quality-score/before \
          -H 'Content-Type: application/json' \
-         -d '{"task_id":"task_001","data_version":"movielens-1m-v1"}'
+         -d '{"task_id":"task_002","data_version":"movielens-1m-v2"}'
 """
 
 import argparse
@@ -285,7 +285,11 @@ def main():
     ap.add_argument('--port', type=int, default=8080, help='监听端口，默认 8080')
     ap.add_argument('--mode', choices=['local', 'hadoop'], default='hadoop',
                     help='local=本机文件模拟（调试）；hadoop=提交 Hadoop 作业（默认）')
-    ap.add_argument('--data-dir', default=os.path.expanduser('~/data/ml-1m'))
+    ap.add_argument('--data-dir',
+                    default=os.environ.get('ML_DATA_DIR',
+                                           os.path.expanduser('~/data/ml-1m-v2')),
+                    help='原始数据目录（默认 ~/data/ml-1m-v2，即课程给定的 v2 数据；'
+                         'v1 为 GroupLens 官方未改动版本，已停用）')
     ap.add_argument('--work-dir', default='/tmp/mlqc-server')
     args = ap.parse_args()
 

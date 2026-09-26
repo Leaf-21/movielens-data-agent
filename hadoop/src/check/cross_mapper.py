@@ -73,9 +73,12 @@ def main():
 
     if role == 'ratings':
         # ratings 侧：取引用ID，打 R 标签
+        # ⚠️ 只统计结构完整（恰好 4 个字段）的记录。
+        #    否则被替换掉分隔符的坏行会以整行为 key 混进来，被误判成"孤儿引用"，
+        #    把结构问题重复计入一致性问题（rule-v2 修正）。
         for line in stdin:
             f = ml.split_fields(line)
-            if len(f) <= col_idx:
+            if len(f) != 4:
                 continue
             key = f[col_idx]
             if key == b'':
@@ -89,6 +92,9 @@ def main():
         for line in stdin:
             f = ml.split_fields(line)
             if len(f) == 0 or f[0] == b'':
+                continue
+            # 结构损坏的行不参与参照：它的首列并非合法主键
+            if not ml.is_positive_int_str(f[0]):
                 continue
             sys.stdout.write('%s\t%s\n' % (ml.to_text(f[0]), TAG_REF))
 
