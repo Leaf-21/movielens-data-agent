@@ -1,0 +1,47 @@
+# =============================================================================
+#  Git 换行符与文件类型规范
+# =============================================================================
+#  为什么需要这个文件：
+#
+#  本机 Windows 侧设置了 core.autocrlf=true，它会把工作区的换行符转成 CRLF。
+#  这对 .md 文档没影响，但对 .sh / .py 是致命的：
+#    - CRLF 的 shell 脚本在 Linux 上会报  bad interpreter: /usr/bin/env bash^M
+#    - CRLF 的 Python 脚本在 shebang 行会解析失败
+#
+#  本项目要同时在 Windows（编辑）和 Linux/WSL（运行 Hadoop）下工作，
+#  所以必须显式声明换行符，而不能依赖各人本机的 core.autocrlf 设置。
+#
+#  仓库现有文档均为 CRLF，为保持一致，这里让 *.md 继续使用 CRLF；
+#  其余源码一律使用 LF。
+# =============================================================================
+
+# --- 默认：自动识别文本文件，交给 Git 处理换行 ---
+* text=auto
+
+# --- 源码与脚本：强制 LF（Linux 下可直接执行）---
+*.sh   text eol=lf
+*.py   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.cfg  text eol=lf
+*.toml text eol=lf
+*.xml  text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+Dockerfile     text eol=lf
+Makefile       text eol=lf
+
+# --- 文档：保持 CRLF，与仓库中已有文档一致 ---
+*.md text eol=crlf
+
+# --- 二进制文件：禁止任何换行符转换 ---
+*.dat  binary
+*.zip  binary
+*.gz   binary
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.pdf  binary
