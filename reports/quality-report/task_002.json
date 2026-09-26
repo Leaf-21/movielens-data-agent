@@ -1,0 +1,659 @@
+{
+  "task_id": "task_002",
+  "status": "SUCCESS",
+  "stage": "ALL",
+  "data_version": "movielens-1m-v2-clean-v1",
+  "input_version": "movielens-1m-v2",
+  "output_version": "movielens-1m-v2-clean-v1",
+  "rule_version": "rule-v2",
+  "T1": "2000-11-22",
+  "T2": "2000-12-10",
+  "T1_epoch": 974862386,
+  "T2_epoch": 976422054,
+  "split_rule": "时间分位数 70% / 85%",
+  "before_score": {
+    "accurate": 97.7423,
+    "complete": 97.9906,
+    "unique": 99.475,
+    "up_to_date": 29.5905,
+    "consistent": 96.7995,
+    "overall": 91.0134
+  },
+  "after_score": {
+    "accurate": 99.9506,
+    "complete": 100.0,
+    "unique": 100.0,
+    "up_to_date": 21.2159,
+    "consistent": 99.9249,
+    "overall": 92.0905
+  },
+  "score_change": {
+    "accurate": 2.2083,
+    "complete": 2.0094,
+    "unique": 0.525,
+    "up_to_date": -8.3746,
+    "consistent": 3.1254
+  },
+  "statistics": {
+    "before_count": 1161652,
+    "after_count": 1006021,
+    "fixed_count": 65,
+    "deduplicated_count": 55739,
+    "isolated_count": 99892,
+    "clean_count": 1005724,
+    "conflict_count": 232,
+    "conflict_key_count": 4328,
+    "conflict_record_count": 63822,
+    "per_table": {
+      "ratings": {
+        "input": 1150241,
+        "after": 996113,
+        "clean": 996113,
+        "fixed": 0,
+        "conflict": 0,
+        "isolated": 98962,
+        "deduped": 55166,
+        "conflict_keys": 4096
+      },
+      "movies": {
+        "input": 4465,
+        "after": 3883,
+        "clean": 3778,
+        "fixed": 0,
+        "conflict": 105,
+        "isolated": 330,
+        "deduped": 252,
+        "conflict_keys": 105
+      },
+      "users": {
+        "input": 6946,
+        "after": 6025,
+        "clean": 5833,
+        "fixed": 65,
+        "conflict": 127,
+        "isolated": 600,
+        "deduped": 321,
+        "conflict_keys": 127
+      }
+    },
+    "reasons": {
+      "age_invalid": 123,
+      "extra_field": 3802,
+      "field_count_mismatch": 3823,
+      "gender_invalid": 123,
+      "genres_invalid": 174,
+      "mid_out_of_domain": 13936,
+      "occupation_invalid": 123,
+      "ok": 1046476,
+      "rating_not_integer": 27381,
+      "rating_out_of_range": 16504,
+      "sep_replaced": 6056,
+      "timestamp_ms": 13503,
+      "timestamp_not_numeric": 9377,
+      "timestamp_out_of_range": 6001,
+      "title_empty": 58,
+      "title_space": 47,
+      "uid_out_of_domain": 13950,
+      "zip4_truncated": 68,
+      "zipcode_invalid": 127
+    }
+  },
+  "problems": [
+    {
+      "code": "users_u_zip_bad",
+      "dimension": "accurate",
+      "action": "fix",
+      "severity": "low",
+      "count": 279,
+      "subject": "Zip-code 不符合 5 位数字格式",
+      "reason": "其中美国 ZIP+4 扩展格式（NNNNN-NNNN）可安全截取前 5 位；其余形式（非数字、纯数字但位数不对、空值）无法确定正确值，需隔离"
+    },
+    {
+      "code": "ratings_r_uid_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "high",
+      "count": 9377,
+      "subject": "ratings.UserID 不是正整数",
+      "reason": "标识符格式异常，无法确定正确值"
+    },
+    {
+      "code": "ratings_r_mid_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "high",
+      "count": 9377,
+      "subject": "ratings.MovieID 不是正整数",
+      "reason": "标识符格式异常，无法确定正确值"
+    },
+    {
+      "code": "ratings_r_rating_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "high",
+      "count": 49886,
+      "subject": "Rating 超出 1-5 范围或不是整数",
+      "reason": "评分值非法，且无法推断用户真实评分"
+    },
+    {
+      "code": "ratings_r_ts_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "medium",
+      "count": 38633,
+      "subject": "Timestamp 不可解释或超出数据集时间范围",
+      "reason": "时间戳无法解释，无法确定正确时间"
+    },
+    {
+      "code": "movies_m_mid_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "high",
+      "count": 29,
+      "subject": "movies.MovieID 不是正整数",
+      "reason": "标识符格式异常"
+    },
+    {
+      "code": "movies_m_title_empty",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "high",
+      "count": 87,
+      "subject": "电影标题为空",
+      "reason": "缺少必需字段，无法补全"
+    },
+    {
+      "code": "movies_m_year_missing",
+      "dimension": "accurate",
+      "action": "keep",
+      "severity": "low",
+      "count": 145,
+      "subject": "标题结尾缺少年份",
+      "reason": "年份缺失属信息不足，不影响记录唯一性"
+    },
+    {
+      "code": "users_u_uid_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "high",
+      "count": 45,
+      "subject": "users.UserID 不是正整数",
+      "reason": "标识符格式异常"
+    },
+    {
+      "code": "users_u_gender_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "low",
+      "count": 168,
+      "subject": "Gender 不在 {M, F} 范围",
+      "reason": "取值编码超出数据说明，无法确定真实性别，移出主数据集"
+    },
+    {
+      "code": "users_u_age_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "low",
+      "count": 168,
+      "subject": "Age 不属于规定年龄段编码",
+      "reason": "取值编码超出数据说明，无法确定真实年龄段，移出主数据集"
+    },
+    {
+      "code": "users_u_occ_bad",
+      "dimension": "accurate",
+      "action": "isolate",
+      "severity": "low",
+      "count": 168,
+      "subject": "Occupation 超出 0-20 编码范围",
+      "reason": "取值编码超出数据说明，无法确定真实职业，移出主数据集"
+    },
+    {
+      "code": "ratings_missing",
+      "dimension": "complete",
+      "action": "isolate",
+      "severity": "high",
+      "count": 23255,
+      "subject": "ratings 存在必需字段缺失的记录",
+      "reason": "必需字段缺失使记录无法参与分析"
+    },
+    {
+      "code": "movies_missing",
+      "dimension": "complete",
+      "action": "isolate",
+      "severity": "high",
+      "count": 87,
+      "subject": "movies 存在必需字段缺失的记录",
+      "reason": "必需字段缺失使记录无法定位"
+    },
+    {
+      "code": "ratings_pair_dup_violations",
+      "dimension": "unique",
+      "action": "dedupe",
+      "severity": "high",
+      "count": 4815,
+      "subject": "同一用户对同一电影存在多条评分记录",
+      "reason": "业务主键 (UserID, MovieID) 重复"
+    },
+    {
+      "code": "movies_movie_dup_violations",
+      "dimension": "unique",
+      "action": "dedupe",
+      "severity": "high",
+      "count": 495,
+      "subject": "movies.MovieID 重复",
+      "reason": "主键重复"
+    },
+    {
+      "code": "users_user_dup_violations",
+      "dimension": "unique",
+      "action": "dedupe",
+      "severity": "high",
+      "count": 789,
+      "subject": "users.UserID 重复",
+      "reason": "主键重复"
+    },
+    {
+      "code": "users_orphan_records",
+      "dimension": "consistent",
+      "action": "isolate",
+      "severity": "high",
+      "count": 10502,
+      "subject": "ratings 引用的 UserID 在 users 中不存在",
+      "reason": "跨表关联断裂，评分记录无法关联到用户属性"
+    },
+    {
+      "code": "movies_orphan_records",
+      "dimension": "consistent",
+      "action": "isolate",
+      "severity": "high",
+      "count": 10502,
+      "subject": "ratings 引用的 MovieID 在 movies 中不存在",
+      "reason": "跨表关联断裂，评分记录无法关联到电影信息"
+    },
+    {
+      "code": "movies_value_multi_violations",
+      "dimension": "consistent",
+      "action": "dedupe",
+      "severity": "high",
+      "count": 384,
+      "subject": "同一 MovieID 对应多个 Title 或 Genres",
+      "reason": "同一标识对应矛盾信息，数据本身无法判断哪个正确；清洗按确定性规则保留一条，其余移除，该问题**未真正解决**"
+    },
+    {
+      "code": "users_attr_multi_violations",
+      "dimension": "consistent",
+      "action": "dedupe",
+      "severity": "medium",
+      "count": 608,
+      "subject": "同一 UserID 对应多组冲突的用户属性",
+      "reason": "属性冲突，数据本身无法判断哪组正确；清洗按确定性规则保留一条，其余移除，该问题**未真正解决**"
+    },
+    {
+      "code": "movies_m_genres_unknown",
+      "dimension": "consistent",
+      "action": "isolate",
+      "severity": "low",
+      "count": 174,
+      "subject": "Genres 出现未识别的类型名称",
+      "reason": "类别不在 ml-1m 的 18 个标准类别内（如注入的 UnknownGenre），无法确定应映射到哪个标准类别，移出主数据集"
+    },
+    {
+      "code": "movies_m_genres_empty",
+      "dimension": "consistent",
+      "action": "isolate",
+      "severity": "low",
+      "count": 50,
+      "subject": "Genres 字段为空",
+      "reason": "类型信息完全缺失，无法通过其它字段推导；注意 Genres 属可选属性，此处置是\"无法验证\"而非\"记录错误\""
+    },
+    {
+      "code": "movies_m_title_space",
+      "dimension": "consistent",
+      "action": "fix",
+      "severity": "low",
+      "count": 47,
+      "subject": "电影标题首尾存在空白字符",
+      "reason": "可安全去除首尾空白"
+    },
+    {
+      "code": "movies_m_title_nonascii",
+      "dimension": "consistent",
+      "action": "keep",
+      "severity": "info",
+      "count": 104,
+      "subject": "电影标题含 ISO-8859-1 特殊字符",
+      "reason": "数据本身正确（如 Misérables），属编码处理问题。必须确保按 ISO-8859-1 读取并以同编码输出"
+    },
+    {
+      "code": "ratings_r_ts_bad",
+      "dimension": "up_to_date",
+      "action": "isolate",
+      "severity": "medium",
+      "count": 38633,
+      "subject": "时间戳不可解释，无法参与时效性评价",
+      "reason": "时间不可解释的记录无法归入任何时间窗口"
+    }
+  ],
+  "unresolved_problems": [
+    {
+      "code": "users_orphan_records",
+      "dimension": "consistent",
+      "action": "isolate",
+      "severity": "high",
+      "count": 2994,
+      "subject": "ratings 引用的 UserID 在 users 中不存在",
+      "reason": "跨表关联断裂，评分记录无法关联到用户属性"
+    },
+    {
+      "code": "clean_conflict_keys",
+      "dimension": "consistent",
+      "action": "dedupe",
+      "severity": "medium",
+      "count": 4328,
+      "subject": "同一主键存在多条均合法但取值不同的记录，已保留其中一条",
+      "reason": "数据本身无法判定哪一条为真值；清洗只做了确定性选择，未解决问题。涉及记录 63822 条，被保留 232 条。"
+    }
+  ],
+  "report": {
+    "method": {
+      "summary": "五维质量评分采用\"违规率扣分\"模型：得分 = 100 × (1 − 违规记录数 ÷ 适用记录总数)，分值范围 0–100。",
+      "dimensions": {
+        "accurate": "字段值的合法性。对 12 项字段级检查做微平均（每字段一次机会），避免字段数多的表主导整体得分。",
+        "complete": "业务必需字段的完整性。仅统计\"必需字段\"缺失，用户属性等自愿填写字段的缺失视为信息不足，不计入扣分。",
+        "unique": "业务主键的唯一性。ratings 以 (UserID, MovieID) 为主键，movies 以 MovieID、users 以 UserID 为主键。",
+        "up_to_date": "时间戳的可解释性与新近程度。本项仅计入第一层（时间可解释性），不以\"距今天\"为参照，避免把历史数据误判为质量问题。",
+        "consistent": "跨表引用完整性与表内格式一致性，两者各占 50%。"
+      },
+      "weights": {
+        "accurate": 0.25,
+        "complete": 0.25,
+        "unique": 0.15,
+        "up_to_date": 0.1,
+        "consistent": 0.25
+      },
+      "weight_note": "综合分 = 五维加权平均。权重为设计选择而非测量结果，改变权重会改变综合分排序。",
+      "overall": 91.0134,
+      "score_range": "[0, 100]",
+      "same_criteria": "清洗前后使用同一份评分程序、同一套阈值与权重，仅输入数据集不同，以保证结果可比较。",
+      "rule_version": "rule-v2",
+      "evaluation_doc": "docs/evaluation-method.md"
+    },
+    "improvements": [
+      {
+        "dimension": "accurate",
+        "dimension_cn": "准确性",
+        "before": 97.7423,
+        "after": 99.9506,
+        "delta": 2.2083,
+        "description": "准确性维度得分由 97.7423 提升至 99.9506，变化 +2.2083。主要由于非法字段值被修复或隔离。"
+      },
+      {
+        "dimension": "complete",
+        "dimension_cn": "完整性",
+        "before": 97.9906,
+        "after": 100.0,
+        "delta": 2.0094,
+        "description": "完整性维度得分由 97.9906 提升至 100.0000，变化 +2.0094。主要由于关键字段缺失的记录被隔离。"
+      },
+      {
+        "dimension": "unique",
+        "dimension_cn": "唯一性",
+        "before": 99.475,
+        "after": 100.0,
+        "delta": 0.525,
+        "description": "唯一性维度得分由 99.4750 提升至 100.0000，变化 +0.5250。主要由于重复记录被去重。"
+      },
+      {
+        "dimension": "up_to_date",
+        "dimension_cn": "时效性",
+        "before": 29.5905,
+        "after": 21.2159,
+        "delta": -8.3746,
+        "description": "时效性维度得分由 29.5905 下降至 21.2159，变化 -8.3746。本维度不以\"错误率\"衡量，而是衡量数据的新近程度：清洗前的较高得分可能来自被 clamp 到上界的异常时间戳（如毫秒时间戳、2100 年时间戳），清洗后回落到真实水平。需在报告中核对是否属于这种情况，不得直接判定为清洗引入的新问题。"
+      },
+      {
+        "dimension": "consistent",
+        "dimension_cn": "一致性",
+        "before": 96.7995,
+        "after": 99.9249,
+        "delta": 3.1254,
+        "description": "一致性维度得分由 96.7995 提升至 99.9249，变化 +3.1254。主要由于跨表关联断裂的记录被隔离，或格式不一致的字段被规范化。"
+      }
+    ],
+    "unresolved": [
+      {
+        "code": "users_orphan_records",
+        "dimension": "consistent",
+        "dimension_cn": "一致性",
+        "count": 2994,
+        "subject": "ratings 引用的 UserID 在 users 中不存在",
+        "disposition": "已隔离：该批记录被移出主数据集单独保存，问题本身未被修正。"
+      },
+      {
+        "code": "clean_conflict_keys",
+        "dimension": "consistent",
+        "dimension_cn": "一致性",
+        "count": 4328,
+        "subject": "同一主键存在多条均合法但取值不同的记录，已保留其中一条",
+        "disposition": "计划去重：重复记录将被移除。"
+      }
+    ],
+    "limitations": [
+      {
+        "topic": "用户属性真实性",
+        "detail": "users.dat 的性别、年龄、职业、邮编由用户自愿填写，GroupLens 未核验其准确性。格式正确不能证明内容真实。"
+      },
+      {
+        "topic": "评分是否反映真实偏好",
+        "detail": "数据集不含行为真值，\"用户评了 5 分\"是否反映真实喜好无法从数据判定。"
+      },
+      {
+        "topic": "Zip-code 与地区的一致性",
+        "detail": "缺少地区真值参照，无法交叉验证邮编与职业等信息是否匹配。"
+      },
+      {
+        "topic": "匿名用户的身份",
+        "detail": "用户标识已匿名化，无法判断不同 UserID 是否属于同一自然人。"
+      },
+      {
+        "topic": "同名电影是否为同一部",
+        "detail": "不同 MovieID 可能存在相同标题（如翻拍作品），仅凭标题无法判定，需外部知识库。"
+      },
+      {
+        "topic": "时间戳时区",
+        "detail": "数据集未声明时区，本系统统一按 UTC 解释，可能存在固定偏移。"
+      },
+      {
+        "topic": "评分行为分布是否异常",
+        "detail": "用户评分数量差异大、评分集中在高分等现象，依据项目需求第 51 行需结合数据背景判断，本系统不作为质量问题扣分。"
+      },
+      {
+        "topic": "合法性不等于准确性",
+        "detail": "准确性维度实际衡量的是\"字段值合法率\"，不能等同于\"数据真实准确\"。"
+      }
+    ],
+    "_status": "完整报告：含清洗前后对比"
+  },
+  "dataset": {
+    "ratings": 1150241,
+    "movies": 4465,
+    "users": 6946,
+    "time_range": [
+      "2000-04-25",
+      "2003-02-28"
+    ]
+  },
+  "weights": {
+    "accurate": 0.25,
+    "complete": 0.25,
+    "unique": 0.15,
+    "up_to_date": 0.1,
+    "consistent": 0.25
+  },
+  "score_details": {
+    "accurate": {
+      "checks": 12,
+      "per_check_rates": [
+        "9377/1150241",
+        "9377/1150241",
+        "49886/1150241",
+        "38633/1150241",
+        "29/4465",
+        "87/4465",
+        "145/4465",
+        "45/6946",
+        "168/6946",
+        "168/6946",
+        "168/6946",
+        "279/6946"
+      ]
+    },
+    "complete": {
+      "missing_records": 23342,
+      "total_records": 1161652,
+      "rate": 0.020093797453970726
+    },
+    "unique": {
+      "dup_violations": 6099,
+      "total_records": 1161652,
+      "rate": 0.005250281495663073
+    },
+    "up_to_date": {
+      "explainable_records": 1111608,
+      "total_records": 1150241,
+      "reliability_violation_rate": 0.0335868744,
+      "reliability_score": 96.6413,
+      "freshness_sum": 346333.8298798108,
+      "freshness_n": 1131112,
+      "freshness_mean": 0.306188803478,
+      "formula": "100 × (1 − reliability_violation_rate) × freshness_mean = 100 × reliability_score/100 × freshness_mean",
+      "note": "T1/T2 按分位数切分，按定义 70% 的记录落在 T1 之前，其 freshness 被 clamp 为 0，故本维度得分（29.5905）明显低于其他四维。这是数据时间分布的客观反映，与数据质量无关；依据迭代一需求第 51 行，数据年代较早并不必然属于错误。"
+    },
+    "consistent": {
+      "ref_integrity_ratio": 0.0091302605,
+      "format_consistency_ratio": 0.0548791848,
+      "orphan_records": {
+        "users": 10502,
+        "movies": 10502
+      }
+    }
+  },
+  "metrics": {
+    "ratings_freshness_n": 1131112,
+    "ratings_freshness_skipped": 19129,
+    "ratings_freshness_sum": 346333.8298798108,
+    "ratings_d1_ok": 1131112,
+    "ratings_d2_ok": 1111608,
+    "ratings_lines": 1150241,
+    "ratings_malformed": 13503,
+    "ratings_missing": 23255,
+    "ratings_r_mid_bad": 9377,
+    "ratings_r_rating_bad": 49886,
+    "ratings_r_ts_bad": 38633,
+    "ratings_r_uid_bad": 9377,
+    "ratings_total": 1150241,
+    "movies_m_genres_dup": 0,
+    "movies_m_genres_empty": 50,
+    "movies_m_genres_emptyitem": 0,
+    "movies_m_genres_unknown": 174,
+    "movies_m_mid_bad": 29,
+    "movies_m_title_empty": 87,
+    "movies_m_title_nonascii": 104,
+    "movies_m_title_space": 47,
+    "movies_m_year_bad": 0,
+    "movies_m_year_missing": 145,
+    "movies_malformed": 70,
+    "movies_missing": 87,
+    "movies_total": 4465,
+    "users_malformed": 108,
+    "users_missing": 0,
+    "users_total": 6946,
+    "users_u_age_bad": 168,
+    "users_u_filled_age": 6878,
+    "users_u_filled_gender": 6878,
+    "users_u_filled_occup": 6878,
+    "users_u_filled_zipcode": 6847,
+    "users_u_gender_bad": 168,
+    "users_u_occ_bad": 168,
+    "users_u_uid_bad": 45,
+    "users_u_zip_bad": 279,
+    "users_u_zip_leadingzero": 733,
+    "users_rating_records": 1133362,
+    "users_matched_records": 1122860,
+    "users_orphan_records": 10502,
+    "users_orphan_ids": 10502,
+    "movies_rating_records": 1133362,
+    "movies_matched_records": 1122860,
+    "movies_orphan_records": 10502,
+    "movies_orphan_ids": 10502,
+    "ratings_pair_dup_keys": 1021932,
+    "ratings_pair_dup_violations": 4815,
+    "movies_movie_dup_keys": 3970,
+    "movies_movie_dup_violations": 495,
+    "users_user_dup_keys": 6157,
+    "users_user_dup_violations": 789,
+    "movies_value_multi_keys": 3941,
+    "movies_value_multi_violations": 384,
+    "users_attr_multi_keys": 6112,
+    "users_attr_multi_violations": 608
+  },
+  "after_metrics": {
+    "ratings_freshness_n": 996113,
+    "ratings_freshness_skipped": 0,
+    "ratings_freshness_sum": 211334.8298798215,
+    "ratings_d1_ok": 996113,
+    "ratings_d2_ok": 996113,
+    "ratings_lines": 996113,
+    "ratings_malformed": 0,
+    "ratings_missing": 0,
+    "ratings_r_mid_bad": 0,
+    "ratings_r_rating_bad": 0,
+    "ratings_r_ts_bad": 0,
+    "ratings_r_uid_bad": 0,
+    "ratings_total": 996113,
+    "movies_m_genres_dup": 0,
+    "movies_m_genres_empty": 0,
+    "movies_m_genres_emptyitem": 0,
+    "movies_m_genres_unknown": 0,
+    "movies_m_mid_bad": 0,
+    "movies_m_title_empty": 0,
+    "movies_m_title_nonascii": 74,
+    "movies_m_title_space": 0,
+    "movies_m_year_bad": 0,
+    "movies_m_year_missing": 23,
+    "movies_malformed": 0,
+    "movies_missing": 0,
+    "movies_total": 3883,
+    "users_malformed": 0,
+    "users_missing": 0,
+    "users_total": 6025,
+    "users_u_age_bad": 0,
+    "users_u_filled_age": 6025,
+    "users_u_filled_gender": 6025,
+    "users_u_filled_occup": 6025,
+    "users_u_filled_zipcode": 6025,
+    "users_u_gender_bad": 0,
+    "users_u_occ_bad": 0,
+    "users_u_uid_bad": 0,
+    "users_u_zip_bad": 0,
+    "users_u_zip_leadingzero": 661,
+    "users_rating_records": 996113,
+    "users_matched_records": 993119,
+    "users_orphan_records": 2994,
+    "users_orphan_ids": 15,
+    "movies_rating_records": 996113,
+    "movies_matched_records": 996113,
+    "movies_orphan_records": 0,
+    "movies_orphan_ids": 0,
+    "ratings_pair_dup_keys": 996113,
+    "ratings_pair_dup_violations": 0,
+    "movies_movie_dup_keys": 3883,
+    "movies_movie_dup_violations": 0,
+    "users_user_dup_keys": 6025,
+    "users_user_dup_violations": 0,
+    "movies_value_multi_keys": 3883,
+    "movies_value_multi_violations": 0,
+    "users_attr_multi_keys": 6025,
+    "users_attr_multi_violations": 0
+  }
+}
