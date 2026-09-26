@@ -1,0 +1,147 @@
+{
+  "task_id": "task_001",
+  "status": "success",
+  "stage": "quality_check",
+  "data_version": "movielens-1m-v1",
+  "rule_version": "rule-v1",
+  "T1": "2002-04-23",
+  "T2": "2002-09-25",
+  "before_score": {
+    "accurate": 99.8882,
+    "complete": 100.0,
+    "unique": 100.0,
+    "up_to_date": 100.0,
+    "consistent": 99.8659,
+    "overall": 99.9385
+  },
+  "after_score": {
+    "accurate": null,
+    "complete": null,
+    "unique": null,
+    "up_to_date": null,
+    "consistent": null,
+    "overall": null
+  },
+  "statistics": {
+    "before_count": 1010132,
+    "after_count": null,
+    "fixed_count": null,
+    "deduplicated_count": null,
+    "isolated_count": null,
+    "_note": "本阶段仅完成检查与 Before 评分；After 相关字段在 clean 阶段填充。"
+  },
+  "dataset": {
+    "ratings": 1000209,
+    "movies": 3883,
+    "users": 6040,
+    "time_range": [
+      "2000-04-25",
+      "2003-02-28"
+    ]
+  },
+  "weights": {
+    "accurate": 0.25,
+    "complete": 0.25,
+    "unique": 0.15,
+    "up_to_date": 0.1,
+    "consistent": 0.25
+  },
+  "score_details": {
+    "accurate": {
+      "checks": 12,
+      "per_check_rates": [
+        "0/1000209",
+        "0/1000209",
+        "0/1000209",
+        "0/1000209",
+        "0/3883",
+        "0/3883",
+        "0/3883",
+        "0/6040",
+        "0/6040",
+        "0/6040",
+        "0/6040",
+        "81/6040"
+      ]
+    },
+    "complete": {
+      "missing_records": 0,
+      "total_records": 1010132,
+      "rate": 0.0
+    },
+    "unique": {
+      "dup_violations": 0,
+      "total_records": 1010132,
+      "rate": 0.0
+    },
+    "up_to_date": {
+      "explainable_records": 1000209,
+      "total_records": 1000209,
+      "note": "仅计入第一层（时间可解释性）；第二层新鲜度在 score 模块中按 T1/T2 计算"
+    },
+    "consistent": {
+      "ref_integrity_ratio": 0.0,
+      "format_consistency_ratio": 0.0026821192,
+      "orphan_records": {
+        "users": 0,
+        "movies": 0
+      }
+    }
+  },
+  "metrics": {
+    "ratings_d1_ok": 1000209,
+    "ratings_d2_ok": 1000209,
+    "ratings_lines": 1000209,
+    "ratings_malformed": 0,
+    "ratings_missing": 0,
+    "ratings_r_mid_bad": 0,
+    "ratings_r_rating_bad": 0,
+    "ratings_r_ts_bad": 0,
+    "ratings_r_uid_bad": 0,
+    "ratings_total": 1000209,
+    "movies_m_genres_dup": 0,
+    "movies_m_genres_empty": 0,
+    "movies_m_genres_emptyitem": 0,
+    "movies_m_genres_unknown": 0,
+    "movies_m_mid_bad": 0,
+    "movies_m_title_empty": 0,
+    "movies_m_title_nonascii": 50,
+    "movies_m_title_space": 0,
+    "movies_m_year_bad": 0,
+    "movies_m_year_missing": 0,
+    "movies_malformed": 0,
+    "movies_missing": 0,
+    "movies_total": 3883,
+    "users_malformed": 0,
+    "users_missing": 0,
+    "users_total": 6040,
+    "users_u_age_bad": 0,
+    "users_u_filled_age": 6040,
+    "users_u_filled_gender": 6040,
+    "users_u_filled_occup": 6040,
+    "users_u_filled_zipcode": 6040,
+    "users_u_gender_bad": 0,
+    "users_u_occ_bad": 0,
+    "users_u_uid_bad": 0,
+    "users_u_zip_bad": 81,
+    "users_u_zip_leadingzero": 662,
+    "users_rating_records": 1000209,
+    "users_matched_records": 1000209,
+    "users_orphan_records": 0,
+    "users_orphan_ids": 0,
+    "movies_rating_records": 1000209,
+    "movies_matched_records": 1000209,
+    "movies_orphan_records": 0,
+    "movies_orphan_ids": 0,
+    "ratings_pair_dup_keys": 1000209,
+    "ratings_pair_dup_violations": 0,
+    "movies_movie_dup_keys": 3883,
+    "movies_movie_dup_violations": 0,
+    "users_user_dup_keys": 6040,
+    "users_user_dup_violations": 0,
+    "movies_value_multi_keys": 3883,
+    "movies_value_multi_violations": 0,
+    "users_attr_multi_keys": 6040,
+    "users_attr_multi_violations": 0
+  }
+}
