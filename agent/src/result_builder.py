@@ -108,6 +108,12 @@ def build(task_id, state, cfg, do_clean):
     else:
         _, unresolved = bridge.build_problems(before_metrics)
 
+    # 主键冲突必须单独补入：清洗后主键不再重复，after 指标里看不出冲突，
+    # 该结论只存在于清洗统计中（接口规范第 13.2 / 14 节，rule-v2）。
+    conflict_item = bridge.build_conflict_unresolved(clean_stats)
+    if conflict_item:
+        unresolved.append(conflict_item)
+
     # ---- statistics ----
     bc = before_count_of(before_metrics)
     if clean_stats:
@@ -117,6 +123,11 @@ def build(task_id, state, cfg, do_clean):
             'fixed_count': clean_stats.get('fixed_count'),
             'deduplicated_count': clean_stats.get('deduplicated_count'),
             'isolated_count': clean_stats.get('isolated_count'),
+            # rule-v2 新增：主键冲突统计（接口规范第 13 节）。
+            # 不透传前端就看不到"未解决冲突"，故与 unresolved 一并处理。
+            'conflict_count': clean_stats.get('conflict_count'),
+            'conflict_key_count': clean_stats.get('conflict_key_count'),
+            'conflict_record_count': clean_stats.get('conflict_record_count'),
         }
     else:
         # 未清洗 / 清洗失败：After 相关一律 null（接口规范第 2.2 节）
@@ -126,6 +137,9 @@ def build(task_id, state, cfg, do_clean):
             'fixed_count': None,
             'deduplicated_count': None,
             'isolated_count': None,
+            'conflict_count': None,
+            'conflict_key_count': None,
+            'conflict_record_count': None,
             '_note': '清洗尚未执行（或执行失败），After 相关统计为 null。',
         }
 

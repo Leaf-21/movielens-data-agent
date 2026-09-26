@@ -77,16 +77,26 @@ class TestBuild(unittest.TestCase):
         self.assertEqual(st['isolated_count'], 1)
         # 隔离 != 修复：两个计数必须独立存在，不被合并
         self.assertNotEqual(st['fixed_count'], st['isolated_count'])
+        # rule-v2：主键冲突三个统计字段必须透传（否则前端看不到未解决冲突）
+        self.assertEqual(st['conflict_count'], CLEAN_STATS['conflict_count'])
+        self.assertEqual(st['conflict_key_count'], CLEAN_STATS['conflict_key_count'])
+        self.assertEqual(st['conflict_record_count'],
+                         CLEAN_STATS['conflict_record_count'])
 
     def test_problems_and_unresolved(self):
         r = result_builder.build('task_t1', _state(), self.cfg, True)
         codes = [p['code'] for p in r['problems']]
         self.assertIn('users_u_zip_bad', codes)             # before 中 5 条
         self.assertIn('movies_m_title_nonascii', codes)
-        # after 指标中 zip_bad=0 -> unresolved 为空；nonascii 是 keep，也不算未解决
-        self.assertEqual(r['unresolved_problems'], [])
+        # after 指标中 zip_bad=0；nonascii 是 keep，也不算未解决。
+        # 但主键冲突只存在于清洗统计中（after 指标看不出），必须显式补入。
+        self.assertEqual([p['code'] for p in r['unresolved_problems']],
+                         ['clean_conflict_keys'])
+        self.assertEqual(r['unresolved_problems'][0]['count'],
+                         CLEAN_STATS['conflict_key_count'])
         # report.unresolved 与之一致（成员A的构建函数生成）
-        self.assertEqual(r['report']['unresolved'], [])
+        self.assertEqual([p['code'] for p in r['report']['unresolved']],
+                         ['clean_conflict_keys'])
 
     def test_report_structure(self):
         r = result_builder.build('task_t1', _state(), self.cfg, True)

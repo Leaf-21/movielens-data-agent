@@ -70,4 +70,16 @@ def build_report(before_scores, after_scores, weights, cfg, unresolved_problems)
                                    unresolved_problems)
 
 
+def build_conflict_unresolved(clean_stats):
+    """
+    主键冲突的未解决问题条目（rule-v2 新增，实现在成员A的 problems.py，单一事实来源）。
+
+    为什么必须单独取：清洗后主键不再重复，**after 指标里看不出冲突**；
+    冲突事实只存在于清洗统计中（conflict_key_count / conflict_record_count）。
+    若不显式携带这一条，前端会呈现"清洗后已无问题"。
+    相应要求见接口规范第 13.2 节与第 14 节。
+    """
+    return problems_mod.build_conflict_unresolved(clean_stats)
+
+
 DIM_ORDER = ('accurate', 'complete', 'unique', 'up_to_date', 'consistent')
