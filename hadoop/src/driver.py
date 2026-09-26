@@ -52,6 +52,8 @@ sys.path.insert(0, PIPELINE_DIR)
 import ml_common as ml
 import problems as problems_mod
 import report as report_mod
+import errors as errors_mod
+from errors import StageError
 
 RUN_CHECK_SH = os.path.join(HADOOP_DIR, 'scripts', 'run_check.sh')
 
@@ -154,13 +156,16 @@ def run_hadoop_job(job, work_dir, verbose=True):
                        env=env, cwd=REPO_DIR)
     out_file = os.path.join(work_dir, job + '.txt')
     if p.returncode != 0:
-        raise SystemExit(
-            '[driver] Hadoop 作业失败: %s（退出码 %d）\n'
-            '  完整输出:\n%s' % (job, p.returncode, p.stdout.decode('utf-8', 'replace'))
+        raise StageError(
+            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='Hadoop 作业执行失败：%s' % job,
+            detail=p.stdout.decode('utf-8', 'replace')[-4000:],
         )
     if not os.path.exists(out_file):
-        raise SystemExit(
-            '[driver] Hadoop 作业 %s 未产生输出文件: %s' % (job, out_file)
+        raise StageError(
+            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='Hadoop 作业 %s 未产生输出文件' % job,
+            detail='期望路径: %s' % out_file,
         )
     with open(out_file, 'r', encoding='utf-8') as f:
         return f.read()
@@ -193,7 +198,11 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
     for tbl, role in tables:
         src = os.path.join(data_dir, TABLE_FILE[tbl])
         if not os.path.exists(src):
-            raise SystemExit('[driver] 找不到数据文件: %s' % src)
+            raise StageError(
+                stage='BEFORE_SCORE', code=errors_mod.DATA_NOT_FOUND,
+                message='找不到数据文件，无法执行检查',
+                detail='期望路径: %s' % src,
+            )
         cmd = mapper_tpl.format(check=CHECK_DIR, data=data_dir)
         if role:
             cmd = 'ML_INPUT_ROLE=%s %s' % (role, cmd)
@@ -202,18 +211,20 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
             p = subprocess.run(['bash', '-c', cmd], stdin=fin, stdout=fout,
                                stderr=subprocess.PIPE)
         if p.returncode != 0:
-            raise SystemExit(
-                '[driver] 本地 mapper 失败: %s / %s（角色 %s，退出码 %d）\n%s'
-                % (job, tbl, role, p.returncode, p.stderr.decode('utf-8', 'replace'))
+            raise StageError(
+                stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+                message='本地 mapper 执行失败：作业 %s，表 %s' % (job, tbl),
+                detail=p.stderr.decode('utf-8', 'replace')[-2000:],
             )
         map_out_parts.append(part)
 
     # --- 空输出检测：mapper 一条都没产出，说明输入或逻辑有问题 ---
     total_bytes = sum(os.path.getsize(p) for p in map_out_parts)
     if total_bytes == 0:
-        raise SystemExit(
-            '[driver] 本地 mapper 无任何输出: %s\n'
-            '  这是个错误信号，而不是"没有违规"。请检查输入数据与 mapper 逻辑。' % job
+        raise StageError(
+            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='mapper 未产生任何输出：%s' % job,
+            detail='空输出是错误信号而非"没有违规"，已判定为失败以避免不可信结果。',
         )
 
     # --- shuffle 阶段：合并后按 key 排序 ---
@@ -233,8 +244,11 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
                            stderr=subprocess.PIPE,
                            env=dict(os.environ, LC_ALL='C'))
     if p.returncode != 0:
-        raise SystemExit('[driver] 本地 sort 失败: %s\n%s'
-                         % (job, p.stderr.decode('utf-8', 'replace')))
+        raise StageError(
+            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='本地排序阶段失败：作业 %s' % job,
+            detail=p.stderr.decode('utf-8', 'replace')[-2000:],
+        )
 
     # --- reduce 阶段 ---
     cmd = reducer_tpl.format(check=CHECK_DIR, data=data_dir)
@@ -242,9 +256,10 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
         p = subprocess.run(['bash', '-c', cmd], stdin=fin,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.returncode != 0:
-        raise SystemExit(
-            '[driver] 本地 reducer 失败: %s（退出码 %d）\n%s'
-            % (job, p.returncode, p.stderr.decode('utf-8', 'replace'))
+        raise StageError(
+            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='本地 reducer 执行失败：作业 %s' % job,
+            detail=p.stderr.decode('utf-8', 'replace')[-2000:],
         )
     return p.stdout.decode('latin-1')
 
@@ -269,17 +284,19 @@ def collect_metrics(mode, work_dir, data_dir, verbose=True):
             tbl = job.split('-', 1)[1]
             key = tbl + '_total'
             if not got.get(key):
-                raise SystemExit(
-                    '[driver] 作业 %s 未报告有效记录数（%s=%r）。\n'
-                    '  这意味着 mapper 没有读到输入数据，结果不可信，'
-                    '拒绝输出这样的 JSON。' % (job, key, got.get(key))
+                raise StageError(
+                    stage='BEFORE_SCORE', code=errors_mod.QUALITY_SCORE_ERROR,
+                    message='作业 %s 未报告有效记录数，结果不可信' % job,
+                    detail='指标 %s 的值为 %r，说明 mapper 没有读到输入数据，'
+                           '拒绝输出这样的结果。' % (key, got.get(key)),
                 )
 
         dup = set(got) & set(metrics)
         if dup:
-            raise SystemExit(
-                '[driver] 指标名冲突（作业 %s 与之前重复）: %r\n'
-                '  这说明两个作业输出了同名指标，无法安全汇总。' % (job, sorted(dup))
+            raise StageError(
+                stage='BEFORE_SCORE', code=errors_mod.QUALITY_SCORE_ERROR,
+                message='指标名冲突，无法安全汇总',
+                detail='作业 %s 与之前重复的指标: %r' % (job, sorted(dup)),
             )
         metrics.update(got)
     return metrics
@@ -636,18 +653,16 @@ def stage_clean(args, task_id):
     响应契约（接口规范第 10 节）：
         {"task_id", "status", "input_version", "output_version",
          "rule_version", "statistics": {五个字段}}
+
+    ⚠️ 尚未实现。按接口规范第 2.2 节与第 15 节，此处抛出结构化错误，
+       由 main() 输出 FAILED 响应，不返回任何占位统计。
     """
-    raise SystemExit(
-        '[driver] 阶段 CLEAN（数据清洗）尚未实现。\n'
-        '\n'
-        '  接口契约已按 docs/接口规范文档.md 第 10 节预留，\n'
-        '  但清洗作业本身仍在开发中（对应 Issue #3）。\n'
-        '\n'
-        '  为遵守接口规范第 2.2 节与第 15 节，本阶段在未实现时\n'
-        '  【明确失败】而不返回占位结果。\n'
-        '\n'
-        '  当前可用的阶段：before（清洗前评分）\n'
-        '  待 clean 完成后，after 阶段即可使用。\n'
+    raise StageError(
+        stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+        message='数据清洗功能尚未实现，无法执行清洗',
+        detail='接口契约已按 docs/接口规范文档.md 第 10 节预留，'
+               '清洗作业开发中（对应 Issue #3）。'
+               '按接口规范第 2.2 节，未实现时明确失败而不返回占位结果。',
     )
 
 
@@ -663,17 +678,19 @@ def stage_after(args, task_id):
     """
     state = load_state(task_id)
     if not state or 'before_metrics' not in state:
-        raise SystemExit(
-            '[driver] 找不到任务 %s 的 before 阶段结果。\n'
-            '  请先执行: --stage before --task-id %s' % (task_id, task_id)
+        raise StageError(
+            stage='AFTER_SCORE', code=errors_mod.INVALID_REQUEST,
+            message='缺少 before 阶段结果，无法执行清洗后评分',
+            detail='请先执行: --stage before --task-id %s' % task_id,
         )
 
     clean_dir = CLEAN_DATA_DIR
     if not os.path.isdir(clean_dir) or not os.listdir(clean_dir):
-        raise SystemExit(
-            '[driver] 未找到清洗后数据集: %s\n'
-            '  请先执行: --stage clean --task-id %s\n'
-            '  （clean 阶段目前尚未实现，见 --stage clean 的说明）' % (clean_dir, task_id)
+        raise StageError(
+            stage='AFTER_SCORE', code=errors_mod.DATA_NOT_FOUND,
+            message='未找到清洗后数据集，无法执行清洗后评分',
+            detail='期望目录: %s。请先执行 --stage clean --task-id %s'
+                   '（clean 阶段尚未实现）' % (clean_dir, task_id),
         )
 
     cfg = ml.load_rules()
@@ -775,14 +792,47 @@ def main():
         print('')
 
     # --- 阶段派发 ---
-    if args.stage == 'before':
-        result = stage_before(args, task_id)
-    elif args.stage == 'clean':
-        result = stage_clean(args, task_id)
-    elif args.stage == 'after':
-        result = stage_after(args, task_id)
-    else:
-        result = stage_all(args, task_id)
+    # 失败时按接口规范第 15 节返回结构化错误响应，而不是裸的报错文本，
+    # 以便 Agent 按 error.code 分类处理。
+    stage_label = {
+        'before': 'BEFORE_SCORE', 'clean': 'CLEANING',
+        'after': 'AFTER_SCORE', 'all': 'BEFORE_SCORE',
+    }[args.stage]
+
+    try:
+        if args.stage == 'before':
+            result = stage_before(args, task_id)
+        elif args.stage == 'clean':
+            result = stage_clean(args, task_id)
+        elif args.stage == 'after':
+            result = stage_after(args, task_id)
+        else:
+            result = stage_all(args, task_id)
+    except SystemExit as e:
+        # 规则文件缺失、参数非法等由其他模块抛出的 SystemExit，
+        # 同样转为结构化错误响应，避免 Agent 收到无法解析的裸文本。
+        msg = str(e.code) if e.code else '未知错误'
+        code = errors_mod.INVALID_RULE_VERSION if 'rule' in msg.lower() \
+            else errors_mod.INTERNAL_ERROR
+        errors_mod.emit_error(task_id, stage_label, code, msg)
+        return 1
+    except StageError as e:
+        # 结构化错误响应：写入 stdout 与状态文件，退出码 1
+        resp = errors_mod.build_error_response(
+            task_id, e.stage, e.code, e.message, e.detail)
+        errors_mod.emit_error(task_id, e.stage, e.code, e.message, e.detail)
+        # 同时落盘，便于排查与后续阶段读取
+        try:
+            st = load_state(task_id) or {}
+            st['_state'] = 'FAILED'
+            st['last_error'] = resp.get('error')
+            save_state(task_id, st)
+        except Exception:
+            pass  # 状态文件写入失败不应掩盖原始错误
+        if not args.quiet:
+            print('', file=sys.stderr)
+            print('[driver] 阶段失败: %s / %s' % (e.stage, e.code), file=sys.stderr)
+        return 1
 
     # --- 输出 ---
     if args.out:
