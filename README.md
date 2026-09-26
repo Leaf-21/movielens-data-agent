@@ -52,6 +52,7 @@ movielens-data-agent/
 - [《迭代一项目分工文档》](docs/迭代一项目分工文档.md) — 三人分工与职责
 - [《引言_项目总体要求与汇报安排》](docs/引言_项目总体要求与汇报安排.md) — 课程总体要求与汇报安排
 - [《迭代一_Hadoop数据清洗与Agent基础》](docs/迭代一_Hadoop数据清洗与Agent基础.md) — 迭代一需求说明
+- [《接口规范文档》](docs/接口规范文档.md) — Frontend ↔ Agent ↔ Hadoop Tool 三层接口定义（三人并行开发共同依据）
 
 ## 数据说明
 
