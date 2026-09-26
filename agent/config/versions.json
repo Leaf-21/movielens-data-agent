@@ -1,0 +1,24 @@
+{
+  "_comment": "Agent 侧版本登记表。【生效数值】（版本号本身、T1/T2、权重）一律以 hadoop/config/rules.json 为唯一来源，本文件只登记每个版本的含义、来源与产出方式，供需求解析与结果解释引用。新增版本时必须同时更新 rules.json 与本文件。",
+  "data_versions": {
+    "movielens-1m-v1": {
+      "kind": "raw",
+      "desc": "GroupLens MovieLens 1M 原始数据（未清洗），ratings.dat / movies.dat / users.dat",
+      "source": "https://files.grouplens.org/datasets/movielens/ml-1m.zip",
+      "consumed_by": "POST /hadoop/quality-score/before, POST /hadoop/clean"
+    },
+    "movielens-1m-v1-clean-v1": {
+      "kind": "cleaned",
+      "desc": "rule-v1 清洗后的数据集（隔离记录不在其中，单独存放于 hadoop/output/isolated/）",
+      "produced_by": "POST /hadoop/clean",
+      "consumed_by": "POST /hadoop/quality-score/after；迭代二/三的训练与评估输入"
+    }
+  },
+  "rule_versions": {
+    "rule-v1": {
+      "desc": "迭代一默认清洗与评分规则（五维定义、阈值、权重、T1/T2）",
+      "defined_in": "hadoop/config/rules.json",
+      "method_doc": "docs/evaluation-method.md"
+    }
+  }
+}
