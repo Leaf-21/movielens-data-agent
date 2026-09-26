@@ -440,8 +440,15 @@ def build_result(task_id, metrics, scores, details):
         'stage': 'quality_check',
         'data_version': cfg['data_version'],
         'rule_version': cfg['rule_version'],
+
+        # T1/T2 同时输出"日期"和"精确 epoch 秒"。
+        # 只给日期是不够的：按日期午夜切分与按分位数精确切分会产生不同结果
+        # （实测差约 0.5 个百分点），后续迭代必须使用 epoch 才能复现同一划分。
         'T1': fmt_epoch(ml.T1),
         'T2': fmt_epoch(ml.T2),
+        'T1_epoch': ml.T1,
+        'T2_epoch': ml.T2,
+        'split_rule': cfg['time'].get('split_rule'),
 
         'before_score': {
             'accurate':   scores.get('accurate'),

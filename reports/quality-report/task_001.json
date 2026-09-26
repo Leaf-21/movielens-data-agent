@@ -4,8 +4,11 @@
   "stage": "quality_check",
   "data_version": "movielens-1m-v1",
   "rule_version": "rule-v1",
-  "T1": "2002-04-23",
-  "T2": "2002-09-25",
+  "T1": "2000-11-22",
+  "T2": "2000-12-10",
+  "T1_epoch": 974862386,
+  "T2_epoch": 976422054,
+  "split_rule": "时间分位数 70% / 85%",
   "before_score": {
     "accurate": 99.8882,
     "complete": 100.0,
