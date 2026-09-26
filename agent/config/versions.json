@@ -1,0 +1,35 @@
+{
+  "_comment": "Agent 侧版本登记表。【生效数值】（版本号本身、T1/T2、权重）一律以 hadoop/config/rules.json 为唯一来源，本文件只登记每个版本的含义、来源与产出方式，供需求解析与结果解释引用。新增版本时必须同时更新 rules.json 与本文件。",
+  "data_versions": {
+    "movielens-1m-v1": {
+      "kind": "raw",
+      "desc": "本项目使用的 MovieLens 1M 格式原始数据（未清洗），ratings.dat / movies.dat / users.dat；来源于南京大学 Moodle 网站发布的课程数据集",
+      "source": "南京大学 Moodle 网站（课程数据分发，本地 data/ml-1m.zip）",
+      "fingerprint": {
+        "md5_zip": "7a39ccfddf1a876f3e1225c4ef4d2523",
+        "md5_files": {
+          "ratings.dat": "2f88ee553bae1460b2cef45b3033e7a3",
+          "movies.dat": "1bf6712bbf46dc0e17ce7e788218b56f",
+          "users.dat": "ff0cee1a71bc607521d86f440501afb2"
+        },
+        "line_counts": { "ratings.dat": 1150241, "movies.dat": 4465, "users.dat": 6946, "total": 1161652 },
+        "taken_at": "2026-09-26"
+      },
+      "note": "行数与 GroupLens 官方版（1000209/3883/6040）不同；rules.json 中 T1/T2 与 expected_split 系按官方规模推导，切换到本版数据的口径需成员A在迭代一评审确认后重算",
+      "consumed_by": "POST /hadoop/quality-score/before, POST /hadoop/clean"
+    },
+    "movielens-1m-v1-clean-v1": {
+      "kind": "cleaned",
+      "desc": "rule-v1 清洗后的数据集（隔离记录不在其中，单独存放于 hadoop/output/isolated/）",
+      "produced_by": "POST /hadoop/clean",
+      "consumed_by": "POST /hadoop/quality-score/after；迭代二/三的训练与评估输入"
+    }
+  },
+  "rule_versions": {
+    "rule-v1": {
+      "desc": "迭代一默认清洗与评分规则（五维定义、阈值、权重、T1/T2）",
+      "defined_in": "hadoop/config/rules.json",
+      "method_doc": "docs/evaluation-method.md"
+    }
+  }
+}

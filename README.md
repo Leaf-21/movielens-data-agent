@@ -56,18 +56,19 @@ movielens-data-agent/
 
 ## 数据说明
 
-原始 MovieLens 1M 数据**不上传仓库**（`.gitignore` 已排除 `*.zip`、`*.dat`），由每位成员在本地配置：
+原始数据**不上传仓库**（`.gitignore` 已排除 `*.zip`、`*.dat`），由每位成员在本地配置：
 
-1. 从 GroupLens 官方下载 `ml-1m.zip`（`https://files.grouplens.org/datasets/movielens/ml-1m.zip`），放入 `data/` 并解压；
-2. 解压后包含三个 `.dat` 文件，**无表头**、字段以 `::` 分隔、编码为 **ISO-8859-1**：
+1. `ml-1m.zip` 来源于**南京大学 Moodle 网站**发布的课程数据（本地存放于 `data/`），放入 `data/` 并解压；
+2. 解压后包含三个 `.dat` 文件（MovieLens 1M 格式），**无表头**、字段以 `::` 分隔、编码为 **ISO-8859-1**：
 
-| 文件 | 字段格式 | 内容 |
+| 文件 | 字段格式 | 内容（本地实测行数） |
 | --- | --- | --- |
-| `ratings.dat` | `UserID::MovieID::Rating::Timestamp` | 1,000,209 条整数评分（1—5）及时间 |
-| `movies.dat` | `MovieID::Title::Genres` | 3,883 条电影记录，类型以 `\|` 分隔 |
-| `users.dat` | `UserID::Gender::Age::Occupation::Zip-code` | 6,040 位用户的性别、年龄段、职业、邮编 |
+| `ratings.dat` | `UserID::MovieID::Rating::Timestamp` | 1,150,241 条评分及时间 |
+| `movies.dat` | `MovieID::Title::Genres` | 4,465 条电影记录，类型以 `\|` 分隔 |
+| `users.dat` | `UserID::Gender::Age::Occupation::Zip-code` | 6,946 位用户的性别、年龄段、职业、邮编 |
 
 3. 注意：邮编按**字符串**处理以免丢失前导零；MovieID 不连续；读取需指定 ISO-8859-1 编码。
+4. 本地数据集与 GroupLens 官方版行数不同（官方为 1,000,209 / 3,883 / 6,040），包含待清洗的质量问题记录，这正是本项目的评估与清洗对象；文件指纹（md5）与行数登记见 `agent/config/versions.json`，用于可复现性核对。
 
 ## 开发流程
 
