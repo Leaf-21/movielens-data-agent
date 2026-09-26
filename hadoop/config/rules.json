@@ -1,6 +1,10 @@
 {
-  "_comment": "MovieLens 数据质量规则的唯一配置来源。Before 与 After 评分必须共用本文件，以保证评价口径一致。修改本文件等同于修改评分口径，须通知成员B与成员C。规则依据见 docs/evaluation-method.md。",
+  "_comment": "MovieLens 数据质量规则的唯一配置来源。Before 与 After 评分必须共用本文件，以保证评价口径一致。修改本文件等同于修改评分口径，须通知成员B与成员C。规则依据见 docs/evaluation-method.md 与 docs/接口规范文档.md。",
   "rule_version": "rule-v1",
+
+  "_version_note": "数据版本命名规范见 docs/接口规范文档.md 第 16 节：原始数据 movielens-1m-v1，清洗后 movielens-1m-v1-clean-v1。",
+  "input_version": "movielens-1m-v1",
+  "output_version": "movielens-1m-v1-clean-v1",
   "data_version": "movielens-1m-v1",
 
   "time": {
@@ -26,7 +30,7 @@
   },
 
   "genres": {
-    "_comment": "实测 movies.dat 中出现的全部 17 个类别，未出现未识别类别。注意是 Children's（带撇号），不是 Children。",
+    "_comment": "实测 movies.dat 中出现的全部 18 个类别，未出现未识别类别。注意是 Children's（带撇号），不是 Children。",
     "valid": [
       "Action",
       "Adventure",

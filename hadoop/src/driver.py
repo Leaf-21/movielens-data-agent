@@ -1,27 +1,35 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-数据质量检查 Driver
+MovieLens 数据治理 Driver
 
 职责：
-  1. 依次运行全部检查作业（格式检查 / 跨表引用 / 唯一性 / 一致性）
+  1. 依次运行检查作业（格式检查 / 跨表引用 / 唯一性 / 一致性）
   2. 汇总各作业输出的计数指标
   3. 按 docs/evaluation-method.md 的公式计算五维得分
-  4. 输出符合团队约定契约的 JSON
+  4. 输出符合 docs/接口规范文档.md 契约的 JSON
+
+三个阶段（对应 docs/接口规范文档.md 第 9、10、11 节的三个接口）
+  before  清洗前质量评分
+  clean   数据清洗
+  after   清洗后质量评分
+  all     一次跑完（等价于 before，供联调与报告使用）
 
 运行模式：
   --mode hadoop  通过 hadoop/scripts/run_check.sh 提交 Hadoop Streaming 作业（正式运行）
-  --mode local   在本机用管道模拟 shuffle（开发调试用，结果应与 hadoop 一致）
+  --mode local   在本机用文件模拟 shuffle（开发调试用，结果应与 hadoop 一致）
 
 用法：
   python3 hadoop/src/driver.py --mode local
   python3 hadoop/src/driver.py --mode hadoop --task-id task_001
+  python3 hadoop/src/driver.py --mode hadoop --stage before --task-id task_001
+  python3 hadoop/src/driver.py --mode hadoop --stage clean  --task-id task_001
 
 ⚠️ 关于"真实结果"的要求：
   本程序不使用任何占位数据。所有数值均来自实际扫描数据文件的统计。
-  若某项统计为空，程序会明确报错退出，而不是填入默认值。
-  依据：docs/迭代一_Hadoop数据清洗与Agent基础.md 第 80 行
-        "执行失败或结果尚未生成时，应返回明确的状态说明，不得生成占位结果。"
+  某个阶段尚未实现或执行失败时，程序**明确报错退出**，绝不返回占位结果。
+  依据：docs/接口规范文档.md 第 2.2 节、第 15 节
+        docs/迭代一_Hadoop数据清洗与Agent基础.md 第 80 行
 """
 
 import argparse
@@ -37,11 +45,23 @@ HADOOP_DIR = os.path.dirname(DRIVER_DIR)                          # hadoop
 REPO_DIR = os.path.dirname(HADOOP_DIR)                            # 仓库根
 CHECK_DIR = os.path.join(DRIVER_DIR, 'check')
 COMMON_DIR = os.path.join(DRIVER_DIR, 'common')
+PIPELINE_DIR = os.path.join(DRIVER_DIR, 'pipeline')
 
 sys.path.insert(0, COMMON_DIR)
+sys.path.insert(0, PIPELINE_DIR)
 import ml_common as ml
+import problems as problems_mod
+import report as report_mod
 
 RUN_CHECK_SH = os.path.join(HADOOP_DIR, 'scripts', 'run_check.sh')
+
+# 五个维度的字段名与顺序（依据接口规范第 12 节）
+DIM_ORDER = ('accurate', 'complete', 'unique', 'up_to_date', 'consistent')
+
+# 任务状态文件与产物的存放位置
+REPORT_DIR = os.path.join(REPO_DIR, 'reports', 'quality-report')
+CLEAN_DATA_DIR = os.path.join(HADOOP_DIR, 'output', 'clean')
+ISOLATED_DATA_DIR = os.path.join(HADOOP_DIR, 'output', 'isolated')
 
 
 # ---------------------------------------------------------------------------
@@ -426,19 +446,86 @@ def fmt_epoch(ts):
     return datetime.datetime.fromtimestamp(int(ts), datetime.timezone.utc).strftime('%Y-%m-%d')
 
 
-def build_result(task_id, metrics, scores, details):
-    """组装符合 docs/GitHub 团队协作开发指导文档.md 第 626-658 行契约的 JSON。"""
+def build_result(task_id, metrics, scores, details, after_metrics=None,
+                 after_scores=None, stats=None):
+    """
+    组装最终评估结果 JSON。
+
+    契约依据：docs/接口规范文档.md 第 13 节（GET /api/tasks/{task_id}/result）
+    本次新增字段：score_change、problems、unresolved_problems、report
+    以及版本命名 input_version / output_version（第 16 节）。
+
+    参数：
+      metrics         清洗前（Before）的指标
+      scores          Before 的五维得分
+      after_metrics   After 的指标，未执行清洗时为 None
+      after_scores    After 的五维得分，未执行清洗时为 None
+      stats           清洗统计（four counts），未执行清洗时为 None
+    """
     cfg = ml.load_rules()
 
     before_count = (metrics.get('ratings_total', 0)
                     + metrics.get('movies_total', 0)
                     + metrics.get('users_total', 0))
 
+    # --- Before 得分 ---
+    before_score = {d: scores.get(d) for d in DIM_ORDER}
+    before_score['overall'] = scores.get('overall')
+
+    # --- After 得分（未执行清洗时全部为 None，不填占位值）---
+    if after_scores:
+        after_score = {d: after_scores.get(d) for d in DIM_ORDER}
+        after_score['overall'] = after_scores.get('overall')
+    else:
+        after_score = {d: None for d in DIM_ORDER}
+        after_score['overall'] = None
+
+    # --- score_change：五维变化量 ---
+    # 只在 After 存在时给出；否则为 None，避免填写 0 被误读为"没有变化"
+    if after_scores:
+        score_change = {}
+        for d in DIM_ORDER:
+            b, a = before_score.get(d), after_score.get(d)
+            score_change[d] = (round(a - b, 4) if (b is not None and a is not None) else None)
+    else:
+        score_change = {d: None for d in DIM_ORDER}
+
+    # --- problems / unresolved_problems ---
+    problems, unresolved = problems_mod.build_problems(metrics, scores)
+
+    # --- report ---
+    rep = report_mod.build_report(before_score, after_score, ml.WEIGHTS, cfg, unresolved)
+
+    # --- statistics ---
+    if stats:
+        statistics = {
+            'before_count': stats.get('before_count', before_count),
+            'after_count': stats.get('after_count'),
+            'fixed_count': stats.get('fixed_count'),
+            'deduplicated_count': stats.get('deduplicated_count'),
+            'isolated_count': stats.get('isolated_count'),
+        }
+    else:
+        # 清洗尚未执行：除 before_count 外一律为 None。
+        # 依据接口规范第 2.2 节，不得用 0 冒充真实结果。
+        statistics = {
+            'before_count': before_count,
+            'after_count': None,
+            'fixed_count': None,
+            'deduplicated_count': None,
+            'isolated_count': None,
+            '_note': '清洗尚未执行，After 相关统计为 null。执行 clean 阶段后填充。',
+        }
+
     return {
         'task_id': task_id,
-        'status': 'success',
-        'stage': 'quality_check',
-        'data_version': cfg['data_version'],
+        'status': 'SUCCESS',
+        'stage': 'ALL' if after_scores else 'BEFORE_SCORE',
+
+        # 版本（接口规范第 16 节）
+        'data_version': cfg['output_version'] if after_scores else cfg['input_version'],
+        'input_version': cfg['input_version'],
+        'output_version': cfg['output_version'] if after_scores else None,
         'rule_version': cfg['rule_version'],
 
         # T1/T2 同时输出"日期"和"精确 epoch 秒"。
@@ -450,32 +537,14 @@ def build_result(task_id, metrics, scores, details):
         'T2_epoch': ml.T2,
         'split_rule': cfg['time'].get('split_rule'),
 
-        'before_score': {
-            'accurate':   scores.get('accurate'),
-            'complete':   scores.get('complete'),
-            'unique':     scores.get('unique'),
-            'up_to_date': scores.get('up_to_date'),
-            'consistent': scores.get('consistent'),
-            'overall':    scores.get('overall'),
-        },
-        # 清洗尚未执行，After 明确置空，不得填占位值
-        'after_score': {
-            'accurate':   None,
-            'complete':   None,
-            'unique':     None,
-            'up_to_date': None,
-            'consistent': None,
-            'overall':    None,
-        },
+        'before_score': before_score,
+        'after_score': after_score,
+        'score_change': score_change,
 
-        'statistics': {
-            'before_count': before_count,
-            'after_count': None,
-            'fixed_count': None,
-            'deduplicated_count': None,
-            'isolated_count': None,
-            '_note': '本阶段仅完成检查与 Before 评分；After 相关字段在 clean 阶段填充。'
-        },
+        'statistics': statistics,
+        'problems': problems,
+        'unresolved_problems': unresolved,
+        'report': rep,
 
         'dataset': {
             'ratings': metrics.get('ratings_total'),
@@ -489,8 +558,181 @@ def build_result(task_id, metrics, scores, details):
 
         'weights': ml.WEIGHTS,
         'score_details': details,
+        # metrics 为本项目附加的调试与追溯字段，不属于接口契约必需项，
+        # 但保留它便于核查每个得分背后的原始计数。
         'metrics': metrics,
     }
+
+
+# ---------------------------------------------------------------------------
+# 阶段化入口（对应接口规范第 9、10、11 节的三个接口）
+# ---------------------------------------------------------------------------
+
+def state_path(task_id):
+    """任务状态文件路径。三个阶段通过它传递中间结果。"""
+    return os.path.join(REPORT_DIR, task_id + '.json')
+
+
+def load_state(task_id):
+    """读取已有任务状态；不存在时返回 None。"""
+    p = state_path(task_id)
+    if not os.path.exists(p):
+        return None
+    with open(p, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def save_state(task_id, data):
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    with open(state_path(task_id), 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return state_path(task_id)
+
+
+def stage_before(args, task_id):
+    """
+    阶段一：清洗前质量评分
+
+    对应接口：POST /hadoop/quality-score/before
+    响应契约（接口规范第 9 节）：
+        {"task_id", "status", "data_version", "scores": {五维}}
+    """
+    if not args.quiet:
+        print('[driver] 阶段: BEFORE_SCORE（清洗前质量评分）')
+
+    metrics = collect_metrics(args.mode, args.work_dir, args.data_dir,
+                              verbose=not args.quiet)
+    scores, details = build_scores(metrics)
+    cfg = ml.load_rules()
+
+    # 状态文件：保存完整指标，供 clean / after 阶段复用
+    state = load_state(task_id) or {}
+    state.update({
+        '_state': 'BEFORE_DONE',
+        'task_id': task_id,
+        'data_version': cfg['input_version'],
+        'rule_version': cfg['rule_version'],
+        'before_metrics': metrics,
+        'before_scores': scores,
+        'before_details': details,
+    })
+    save_state(task_id, state)
+
+    # 接口响应（严格按第 9 节契约）
+    response = {
+        'task_id': task_id,
+        'status': 'SUCCESS',
+        'data_version': cfg['input_version'],
+        'scores': {d: scores.get(d) for d in DIM_ORDER},
+    }
+    return response
+
+
+def stage_clean(args, task_id):
+    """
+    阶段二：数据清洗
+
+    对应接口：POST /hadoop/clean
+    响应契约（接口规范第 10 节）：
+        {"task_id", "status", "input_version", "output_version",
+         "rule_version", "statistics": {五个字段}}
+    """
+    raise SystemExit(
+        '[driver] 阶段 CLEAN（数据清洗）尚未实现。\n'
+        '\n'
+        '  接口契约已按 docs/接口规范文档.md 第 10 节预留，\n'
+        '  但清洗作业本身仍在开发中（对应 Issue #3）。\n'
+        '\n'
+        '  为遵守接口规范第 2.2 节与第 15 节，本阶段在未实现时\n'
+        '  【明确失败】而不返回占位结果。\n'
+        '\n'
+        '  当前可用的阶段：before（清洗前评分）\n'
+        '  待 clean 完成后，after 阶段即可使用。\n'
+    )
+
+
+def stage_after(args, task_id):
+    """
+    阶段三：清洗后质量评分
+
+    对应接口：POST /hadoop/quality-score/after
+    响应契约（接口规范第 11 节）：
+        {"task_id", "status", "data_version", "scores": {五维}}
+
+    依赖：clean 阶段产出的清洗后数据集。
+    """
+    state = load_state(task_id)
+    if not state or 'before_metrics' not in state:
+        raise SystemExit(
+            '[driver] 找不到任务 %s 的 before 阶段结果。\n'
+            '  请先执行: --stage before --task-id %s' % (task_id, task_id)
+        )
+
+    clean_dir = CLEAN_DATA_DIR
+    if not os.path.isdir(clean_dir) or not os.listdir(clean_dir):
+        raise SystemExit(
+            '[driver] 未找到清洗后数据集: %s\n'
+            '  请先执行: --stage clean --task-id %s\n'
+            '  （clean 阶段目前尚未实现，见 --stage clean 的说明）' % (clean_dir, task_id)
+        )
+
+    cfg = ml.load_rules()
+    if not args.quiet:
+        print('[driver] 阶段: AFTER_SCORE（清洗后质量评分）')
+        print('        数据目录: %s' % clean_dir)
+
+    metrics = collect_metrics(args.mode, args.work_dir, clean_dir,
+                              verbose=not args.quiet)
+    scores, details = build_scores(metrics)
+
+    state.update({
+        '_state': 'AFTER_DONE',
+        'data_version': cfg['output_version'],
+        'after_metrics': metrics,
+        'after_scores': scores,
+        'after_details': details,
+    })
+    save_state(task_id, state)
+
+    response = {
+        'task_id': task_id,
+        'status': 'SUCCESS',
+        'data_version': cfg['output_version'],
+        'scores': {d: scores.get(d) for d in DIM_ORDER},
+    }
+    return response
+
+
+def stage_all(args, task_id):
+    """一次跑完 before + after（clean 未实现时 after 为空），输出最终结果契约。"""
+    if not args.quiet:
+        print('[driver] 阶段: ALL（清洗前评分 + 最终结果组装）')
+        print('        注意：clean 阶段尚未实现，after_score 将为 null')
+
+    metrics = collect_metrics(args.mode, args.work_dir, args.data_dir,
+                              verbose=not args.quiet)
+    scores, details = build_scores(metrics)
+
+    state = load_state(task_id) or {}
+    state.update({
+        '_state': 'BEFORE_DONE',
+        'task_id': task_id,
+        'before_metrics': metrics,
+        'before_scores': scores,
+        'before_details': details,
+    })
+
+    after_metrics = state.get('after_metrics')
+    after_scores = state.get('after_scores')
+    stats = state.get('clean_statistics')
+
+    result = build_result(task_id, metrics, scores, details,
+                          after_metrics=after_metrics,
+                          after_scores=after_scores,
+                          stats=stats)
+    state['result'] = result
+    save_state(task_id, state)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -498,13 +740,17 @@ def build_result(task_id, metrics, scores, details):
 # ---------------------------------------------------------------------------
 
 def main():
-    ap = argparse.ArgumentParser(description='MovieLens 数据质量检查 driver')
+    ap = argparse.ArgumentParser(
+        description='MovieLens 数据治理 driver（对应 docs/接口规范文档.md 第 9-11 节）')
+    ap.add_argument('--stage', choices=['all', 'before', 'clean', 'after'], default='all',
+                    help='执行阶段：before=清洗前评分；clean=数据清洗；'
+                         'after=清洗后评分；all=一次跑完（默认，向后兼容）')
     ap.add_argument('--mode', choices=['local', 'hadoop'], default='local',
-                    help='local=本机管道模拟（调试）；hadoop=提交 Hadoop Streaming 作业')
+                    help='local=本机文件模拟（调试）；hadoop=提交 Hadoop Streaming 作业')
     ap.add_argument('--task-id', default=None, help='任务标识，默认按时间生成')
     ap.add_argument('--data-dir', default=os.path.expanduser('~/data/ml-1m'))
     ap.add_argument('--work-dir', default='/tmp/mlqc-driver')
-    ap.add_argument('--out', default=None, help='输出 JSON 路径')
+    ap.add_argument('--out', default=None, help='输出 JSON 路径（默认写入 reports/quality-report/）')
     ap.add_argument('--quiet', action='store_true')
     args = ap.parse_args()
 
@@ -513,30 +759,38 @@ def main():
 
     if not args.quiet:
         print('=' * 62)
-        print(' MovieLens 数据质量检查')
+        print(' MovieLens 数据治理')
+        print('   stage     : %s' % args.stage)
         print('   mode      : %s' % args.mode)
         print('   task_id   : %s' % task_id)
         print('   data_dir  : %s' % args.data_dir)
         print('=' * 62)
 
     ml.init_rules()
+    cfg = ml.load_rules()
     if not args.quiet:
-        print('规则版本: %s   数据版本: %s' % (ml.load_rules()['rule_version'],
-                                             ml.load_rules()['data_version']))
+        print('规则版本: %s   数据版本: %s -> %s' % (
+            cfg['rule_version'], cfg['input_version'], cfg['output_version']))
         print('T1=%s  T2=%s' % (fmt_epoch(ml.T1), fmt_epoch(ml.T2)))
         print('')
-        print('运行检查作业:')
 
-    metrics = collect_metrics(args.mode, args.work_dir, args.data_dir,
-                             verbose=not args.quiet)
-    scores, details = build_scores(metrics)
-    result = build_result(task_id, metrics, scores, details)
+    # --- 阶段派发 ---
+    if args.stage == 'before':
+        result = stage_before(args, task_id)
+    elif args.stage == 'clean':
+        result = stage_clean(args, task_id)
+    elif args.stage == 'after':
+        result = stage_after(args, task_id)
+    else:
+        result = stage_all(args, task_id)
 
-    # 输出
+    # --- 输出 ---
     if args.out:
         out_path = args.out
+    elif args.stage == 'all':
+        out_path = os.path.join(REPORT_DIR, task_id + '.json')
     else:
-        out_path = os.path.join(args.work_dir, task_id + '.json')
+        out_path = os.path.join(args.work_dir, '%s_%s.json' % (task_id, args.stage))
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
@@ -544,16 +798,29 @@ def main():
     if not args.quiet:
         print('')
         print('=' * 62)
-        print(' 五维质量评分（Before）')
-        print('=' * 62)
-        for k in ('accurate', 'complete', 'unique', 'up_to_date', 'consistent'):
-            v = result['before_score'][k]
-            print('   %-12s %s' % (k, ('%.4f' % v) if v is not None else 'N/A'))
-        ov = result['before_score']['overall']
-        print('   %-12s %s' % ('overall', ('%.4f' % ov) if ov is not None else 'N/A'))
+        if args.stage in ('before', 'after'):
+            print(' 五维质量评分（%s）' % ('Before' if args.stage == 'before' else 'After'))
+            print('=' * 62)
+            for k in DIM_ORDER:
+                v = result['scores'].get(k)
+                print('   %-12s %s' % (k, ('%.4f' % v) if v is not None else 'N/A'))
+        else:
+            print(' 五维质量评分（Before）')
+            print('=' * 62)
+            for k in DIM_ORDER:
+                v = result['before_score'].get(k)
+                print('   %-12s %s' % (k, ('%.4f' % v) if v is not None else 'N/A'))
+            ov = result['before_score'].get('overall')
+            print('   %-12s %s' % ('overall', ('%.4f' % ov) if ov is not None else 'N/A'))
+            print('')
+            print(' 问题清单      : %d 条' % len(result.get('problems', [])))
+            print(' 未解决问题    : %d 条' % len(result.get('unresolved_problems', [])))
+            print(' 报告 improvements: %d 条'
+                  % len(result.get('report', {}).get('improvements', [])))
+            print(' 数据规模: ratings=%s movies=%s users=%s' % (
+                result['dataset']['ratings'], result['dataset']['movies'],
+                result['dataset']['users']))
         print('')
-        print(' 数据规模: ratings=%s movies=%s users=%s' % (
-            result['dataset']['ratings'], result['dataset']['movies'], result['dataset']['users']))
         print(' 结果已写入: %s' % out_path)
 
     return 0
