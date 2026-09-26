@@ -33,6 +33,7 @@ MovieLens 数据治理 Driver
 """
 
 import argparse
+import collections
 import datetime
 import json
 import os
@@ -66,6 +67,8 @@ DIM_ORDER = ('accurate', 'complete', 'unique', 'up_to_date', 'consistent')
 REPORT_DIR = os.path.join(REPO_DIR, 'reports', 'quality-report')
 CLEAN_DATA_DIR = os.path.join(HADOOP_DIR, 'output', 'clean')
 ISOLATED_DATA_DIR = os.path.join(HADOOP_DIR, 'output', 'isolated')
+# 审计目录：逐条记录「改了什么、依据什么原因」，供报告与前端展示核查（rule-v2 新增）
+AUDIT_DATA_DIR = os.path.join(HADOOP_DIR, 'output', 'audit')
 
 
 # ---------------------------------------------------------------------------
@@ -166,9 +169,14 @@ def run_hadoop_job(job, work_dir, verbose=True, data_dir=None, stage='BEFORE_SCO
     env['ML_OUT_DIR'] = work_dir
     if data_dir:
         env['ML_INPUT_DIR'] = data_dir
+    # ⚠️ cwd 必须是工作目录，不能是仓库根目录：
+    #    Hadoop Streaming 的 -file 会把 mapper/reducer/rules.json 复制到作业的
+    #    本地工作目录（即 cwd），若在仓库根目录执行，会在仓库里留下
+    #    mapper.py / reducer.py / rules.json 等垃圾文件（实测发生过）。
+    os.makedirs(work_dir, exist_ok=True)
     p = subprocess.run(['bash', RUN_CHECK_SH, job],
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       env=env, cwd=REPO_DIR)
+                       env=env, cwd=work_dir)
     out_file = os.path.join(work_dir, job + '.txt')
     if p.returncode != 0:
         raise StageError(
@@ -440,26 +448,28 @@ def score_up_to_date(m):
 
       Up-to-date = 100 × reliability × mean(freshness)
 
-    ⚠️ 关于本数据集该维度得分偏低的说明
+    ⚠️ 关于本数据集该维度得分偏低的说明（rule-v2 实测，v2 数据集）
     ----------------------------------------------------------------
-    T1/T2 按分位数切分，因此按定义 70% 的记录落在 T1 之前、其 freshness
-    被 clamp 为 0。实测分布：
+    T1/T2 按分位数切分，因此按定义约 70% 的记录落在 T1 之前、其 freshness
+    被 clamp 为 0。清洗后实测分布：
 
-        clamp 到 0  (t <= T1) :  700,144  (70.00%)
-        线性区间    (T1~T2)   :  150,035  (15.00%)
-        clamp 到 1  (t > T2)  :  150,030  (15.00%)
+        clamp 到 0  (t <= T1) :  700,148  (70.29%)
+        线性区间    (T1~T2)   :  150,031  (15.06%)
+        clamp 到 1  (t > T2)  :  145,934  (14.65%)
 
-        freshness 均值 = 0.215385814245
+        freshness 合计 = 211334.8298798215，均值 = 0.212159
 
-    因此本维度得分约为 21.54，明显低于其他四维。
+    因此清洗后本维度得分约为 21.22，明显低于其他四维。
 
     **这不是 bug，与数据质量也无关**：T1/T2 一旦按分位数确定，该均值
-    就基本被锁定（线性区间约贡献 0.075，T2 之后的 15% 贡献 0.15）。
-    它衡量的是"数据在时间窗口内的新近程度"，而本数据集 90.4% 的评分
-    集中在 2000 年，新近程度本来就低。
-
+    就基本被锁定。它衡量的是"数据在时间窗口内的新近程度"，而本数据集
+    90.5% 的评分集中在 2000 年，新近程度本来就低。
     依据 docs/迭代一_Hadoop数据清洗与Agent基础.md 第 51 行：
     "数据年代较早并不必然属于错误"。
+
+    ⚠️ 清洗前该维度得分反而更高（29.5905），原因不是数据更好，而是脏数据里
+    13,503 条毫秒时间戳与大量 2100 年时间戳被 clamp 到上界 1，把均值从
+    真实的 0.2122 抬高到 0.3062。**清洗后得分下降是回归真实，不是回归问题。**
 
     因此本维度在报告中必须配合说明使用，不可单独作为"数据质量差"的依据。
     这也正是该维度权重被设为 0.10（最低档）的原因 —— 见 evaluation-method 第 5.1 节。
@@ -595,7 +605,30 @@ def build_result(task_id, metrics, scores, details, after_metrics=None,
         score_change = {d: None for d in DIM_ORDER}
 
     # --- problems / unresolved_problems ---
-    problems, unresolved = problems_mod.build_problems(metrics, scores)
+    # problems：清洗前识别出的全部问题（含已解决与未解决）
+    problems, unresolved_before = problems_mod.build_problems(metrics, scores)
+
+    # unresolved_problems：**清洗后**仍存在的问题。
+    # 必须用 After 指标构建，否则会把"已经修好的问题"继续列为未解决。
+    # （rule-v2 修正：v1 直接用 Before 指标，导致清洗后仍显示全部问题未解决。）
+    unres_metrics = after_metrics if after_metrics else metrics
+    _, unresolved = problems_mod.build_problems(unres_metrics, after_scores or scores)
+
+    # 主键冲突属于"清洗无法解决"的问题：清洗只能保留一条，
+    # 但保留哪一条并不等于知道真值，因此必须显式列为未解决问题。
+    if stats and stats.get('conflict_key_count'):
+        unresolved.append({
+            'code': 'clean_conflict_keys',
+            'dimension': 'consistent',
+            'action': 'dedupe',
+            'severity': 'medium',
+            'count': stats.get('conflict_key_count'),
+            'subject': '同一主键存在多条均合法但取值不同的记录，已保留其中一条',
+            'reason': '数据本身无法判定哪一条为真值；清洗只做了确定性选择，'
+                      '未解决问题。涉及记录 %d 条，被保留 %d 条。'
+                      % (stats.get('conflict_record_count', 0),
+                         stats.get('conflict_count', 0)),
+        })
 
     # --- report ---
     rep = report_mod.build_report(before_score, after_score, ml.WEIGHTS, cfg, unresolved)
@@ -608,7 +641,16 @@ def build_result(task_id, metrics, scores, details, after_metrics=None,
             'fixed_count': stats.get('fixed_count'),
             'deduplicated_count': stats.get('deduplicated_count'),
             'isolated_count': stats.get('isolated_count'),
+            # rule-v2 扩展字段（向后兼容：老字段含义不变）
+            'clean_count': stats.get('clean_count'),
+            'conflict_count': stats.get('conflict_count'),
+            'conflict_key_count': stats.get('conflict_key_count'),
+            'conflict_record_count': stats.get('conflict_record_count'),
         }
+        if stats.get('per_table'):
+            statistics['per_table'] = stats['per_table']
+        if stats.get('reasons'):
+            statistics['reasons'] = stats['reasons']
     else:
         # 清洗尚未执行：除 before_count 外一律为 None。
         # 依据接口规范第 2.2 节，不得用 0 冒充真实结果。
@@ -618,6 +660,10 @@ def build_result(task_id, metrics, scores, details, after_metrics=None,
             'fixed_count': None,
             'deduplicated_count': None,
             'isolated_count': None,
+            'clean_count': None,
+            'conflict_count': None,
+            'conflict_key_count': None,
+            'conflict_record_count': None,
             '_note': '清洗尚未执行，After 相关统计为 null。执行 clean 阶段后填充。',
         }
 
@@ -664,7 +710,9 @@ def build_result(task_id, metrics, scores, details, after_metrics=None,
         'score_details': details,
         # metrics 为本项目附加的调试与追溯字段，不属于接口契约必需项，
         # 但保留它便于核查每个得分背后的原始计数。
+        # after_metrics 同理：没有它就无法核对 After 得分是怎么算出来的（rule-v2 补充）。
         'metrics': metrics,
+        'after_metrics': after_metrics,
     }
 
 
@@ -760,50 +808,106 @@ def stage_clean(args, task_id):
         print('[driver] 阶段: CLEANING（数据清洗）')
 
     # --- 准备输出目录 ---
-    for d in (CLEAN_DATA_DIR, ISOLATED_DATA_DIR):
+    for d in (CLEAN_DATA_DIR, ISOLATED_DATA_DIR, AUDIT_DATA_DIR):
         os.makedirs(d, exist_ok=True)
 
     work_dir = os.path.join(args.work_dir, 'clean')
     os.makedirs(work_dir, exist_ok=True)
 
-    counts = {'clean_count': 0, 'fixed_count': 0, 'isolated_count': 0,
-              'deduplicated_count': 0, 'unknown_count': 0}
-    after_total = 0
-    before_total = 0
+    total = collections.Counter()
+    per_table = {}
+    reasons = collections.Counter()
 
     for table in ('ratings', 'movies', 'users'):
         tagged, c = _run_clean_job(table, work_dir, args, verbose=not args.quiet)
 
-        # 分流：clean 与 fixed 进入主数据集，isolated 单独保存
+        # 分流：clean / fixed / conflict 进入主数据集，isolated 单独保存
         clean_path = os.path.join(CLEAN_DATA_DIR, TABLE_FILE[table])
         iso_path = os.path.join(ISOLATED_DATA_DIR, TABLE_FILE[table])
+        audit_path = os.path.join(AUDIT_DATA_DIR, table + '.tsv')
 
-        n_clean, n_fixed, n_iso = _split_tagged(tagged, clean_path, iso_path)
+        split = _split_tagged(tagged, clean_path, iso_path, audit_path)
 
-        for k in ('clean_count', 'fixed_count', 'isolated_count', 'unknown_count'):
-            counts[k] += c.get(k, 0)
-        after_total += n_clean + n_fixed
-        before_total += (n_clean + n_fixed + n_iso)
+        # --- 第 1 道校验：作业真的读到了输入文件的每一行 ---
+        src = os.path.join(args.data_dir, TABLE_FILE[table])
+        src_lines = _count_lines(src)
+        if c.get('total_input_count') != src_lines:
+            raise StageError(
+                stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+                message='清洗作业读入行数与输入文件不一致：%s' % table,
+                detail='作业报告 total_input_count=%r，输入文件 %s 实际 %d 行'
+                       % (c.get('total_input_count'), src, src_lines),
+            )
+
+        # --- 第 2 道校验：分流结果必须与 reducer 统计逐项一致 ---
+        for tag in ('clean', 'fixed', 'conflict', 'isolated'):
+            if split[tag] != c.get(tag + '_count', 0):
+                raise StageError(
+                    stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+                    message='清洗分流结果与作业统计不一致：%s / %s' % (table, tag),
+                    detail='分流 %d 行，作业报告 %d 行'
+                           % (split[tag], c.get(tag + '_count', 0)),
+                )
+        if split['unknown']:
+            raise StageError(
+                stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+                message='清洗输出中存在无法识别的标签：%s' % table,
+                detail='unknown=%d，说明 mapper/reducer 契约被破坏' % split['unknown'],
+            )
+
+        # --- 第 3 道校验：输入 = 输出 + 去重移除 ---
+        out_lines = split['clean'] + split['fixed'] + split['conflict'] + split['isolated']
+        if c.get('total_count') != out_lines:
+            raise StageError(
+                stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+                message='清洗输出行数与作业统计不一致：%s' % table,
+                detail='实际输出 %d 行，作业报告 total_count=%d'
+                       % (out_lines, c.get('total_count', -1)),
+            )
+        if c.get('total_input_count') != out_lines + c.get('deduped_count', 0):
+            raise StageError(
+                stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+                message='清洗口径不自洽（输入 ≠ 输出 + 去重）：%s' % table,
+                detail='input=%r output=%d deduped=%r'
+                       % (c.get('total_input_count'), out_lines, c.get('deduped_count')),
+            )
+
+        after = split['clean'] + split['fixed'] + split['conflict']
+        for k in ('clean_count', 'fixed_count', 'conflict_count', 'isolated_count',
+                  'deduped_count', 'conflict_key_count', 'conflict_record_count',
+                  'total_input_count', 'total_count', 'unknown_count'):
+            total[k] += c.get(k, 0)
+        per_table[table] = {
+            'input': c.get('total_input_count', 0),
+            'after': after,
+            'clean': split['clean'],
+            'fixed': split['fixed'],
+            'conflict': split['conflict'],
+            'isolated': split['isolated'],
+            'deduped': c.get('deduped_count', 0),
+            'conflict_keys': c.get('conflict_key_count', 0),
+        }
+        for k, v in c.items():
+            if k.startswith('reason_'):
+                # ⚠️ 注意 reasons 是【三表合计】：同一个原因名会在多张表出现
+                #    （例如 uid_out_of_domain = ratings 13,878 + users 72 = 13,950），
+                #    分表明细请看 statistics.per_table 与 hadoop/output/audit/*.tsv。
+                reasons[k[len('reason_'):]] += v
 
         if not args.quiet:
-            print('         %-8s clean=%-8d fixed=%-5d isolated=%-5d'
-                  % (table, n_clean, n_fixed, n_iso))
+            print('         %-8s clean=%-8d fixed=%-5d conflict=%-5d isolated=%-6d dedup=%d'
+                  % (table, split['clean'], split['fixed'], split['conflict'],
+                     split['isolated'], c.get('deduped_count', 0)))
 
-    # --- 一致性校验：分流后总数必须等于清洗作业报告的总数 ---
-    reported_total = (counts['clean_count'] + counts['fixed_count']
-                      + counts['isolated_count'] + counts['unknown_count'])
-    if before_total != reported_total:
-        raise StageError(
-            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
-            message='清洗结果行数与作业统计不一致，结果不可信',
-            detail='分流后 %d 行，作业报告 %d 行' % (before_total, reported_total),
-        )
-    if counts['unknown_count']:
+    after_total = total['clean_count'] + total['fixed_count'] + total['conflict_count']
+    before_total = total['total_input_count']
+
+    if total['unknown_count']:
         raise StageError(
             stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
             message='清洗输出中存在无法识别的标签',
             detail='unknown_count=%d，说明 mapper/reducer 契约被破坏'
-                   % counts['unknown_count'],
+                   % total['unknown_count'],
         )
     if after_total <= 0:
         raise StageError(
@@ -811,17 +915,19 @@ def stage_clean(args, task_id):
             message='清洗后数据集为空，结果不可信',
         )
 
-    # --- 去重：业务主键重复在清洗 mapper 中未被单独处置 ---
-    # 实测 ratings 的 (UserID, MovieID) 无重复（见 Issue #2），此处如实记录为 0。
-    # 若后续数据出现重复，需在清洗规则中显式增加去重处置后再更新此值。
-    counts['deduplicated_count'] = 0
-
     stats = {
         'before_count': before_total,
         'after_count': after_total,
-        'fixed_count': counts['fixed_count'],
-        'deduplicated_count': counts['deduplicated_count'],
-        'isolated_count': counts['isolated_count'],
+        'fixed_count': total['fixed_count'],
+        'deduplicated_count': total['deduped_count'],
+        'isolated_count': total['isolated_count'],
+        # rule-v2 新增：冲突处置统计（属于未解决问题，不是"已修复"）
+        'conflict_count': total['conflict_count'],
+        'conflict_key_count': total['conflict_key_count'],
+        'conflict_record_count': total['conflict_record_count'],
+        'clean_count': total['clean_count'],
+        'per_table': per_table,
+        'reasons': dict(sorted(reasons.items())),
     }
 
     # --- 写入任务状态，供 after 阶段读取 ---
@@ -837,13 +943,14 @@ def stage_clean(args, task_id):
 
     if not args.quiet:
         print('')
-        print('         before_count=%d  after_count=%d  fixed=%d  dedup=%d  isolated=%d'
+        print('         before_count=%d  after_count=%d  fixed=%d  dedup=%d  isolated=%d  conflict=%d'
               % (stats['before_count'], stats['after_count'], stats['fixed_count'],
-                 stats['deduplicated_count'], stats['isolated_count']))
+                 stats['deduplicated_count'], stats['isolated_count'],
+                 stats['conflict_count']))
         print('         清洗后数据: %s' % CLEAN_DATA_DIR)
         print('         隔离数据  : %s' % ISOLATED_DATA_DIR)
 
-    # 接口响应（严格按第 10 节契约）
+    # 接口响应（严格按第 10 节契约；conflict_* 为 rule-v2 的向后兼容扩展字段）
     return {
         'task_id': task_id,
         'status': 'SUCCESS',
@@ -856,8 +963,33 @@ def stage_clean(args, task_id):
             'fixed_count': stats['fixed_count'],
             'deduplicated_count': stats['deduplicated_count'],
             'isolated_count': stats['isolated_count'],
+            'conflict_count': stats['conflict_count'],
+            'conflict_key_count': stats['conflict_key_count'],
+            'conflict_record_count': stats['conflict_record_count'],
         },
     }
+
+
+def _count_lines(path):
+    """
+    统计文件行数（按字节块读取）。
+
+    用途：校验 Hadoop 清洗作业报告的 total_input_count 是否等于输入文件的真实行数。
+    这是"清洗是否真的在处理数据"的硬校验 —— 若作业读了别的文件或提前退出，
+    这里会立刻暴露，而不是产出一份看似成功的报告。
+    """
+    n = 0
+    last = b''
+    with open(path, 'rb') as f:
+        while True:
+            chunk = f.read(1 << 20)
+            if not chunk:
+                break
+            n += chunk.count(b'\n')
+            last = chunk[-1:]
+    if last and last != b'\n':
+        n += 1
+    return n
 
 
 def _run_clean_job(table, work_dir, args, verbose=True):
@@ -876,9 +1008,11 @@ def _run_clean_job(table, work_dir, args, verbose=True):
     env['ML_DATA_DIR'] = args.data_dir
     env.pop('ML_INPUT_DIR', None)   # 清洗始终以原始数据为输入
 
+    # cwd 用工作目录，避免 Hadoop 的 -file 分发物污染仓库（同 run_hadoop_job）
+    os.makedirs(work_dir, exist_ok=True)
     p = subprocess.run(['bash', RUN_CLEAN_SH, table],
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       env=env, cwd=REPO_DIR)
+                       env=env, cwd=work_dir)
     if p.returncode != 0:
         raise StageError(
             stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
@@ -920,44 +1054,52 @@ def _run_clean_job(table, work_dir, args, verbose=True):
     return tagged, counts
 
 
-def _split_tagged(tagged_path, clean_path, iso_path):
+def _split_tagged(tagged_path, clean_path, iso_path, audit_path):
     """
-    按标签把带标签输出分流为两个文件。
+    按标签把带标签输出分流为两个数据文件 + 一个审计文件。
 
-    输入行格式：<标签>\t<记录原文>
-      clean / fixed  -> clean_path（清洗后数据）
-      isolated       -> iso_path（隔离数据）
+    输入行格式：<标签>\t<原因>\t<记录原文>
+      clean / fixed / conflict -> clean_path（清洗后数据）
+      isolated                 -> iso_path（隔离数据）
+      fixed / isolated / conflict 额外写入 audit_path（<标签>\t<原因>\t<记录>），
+      作为"处理了哪些问题记录、依据什么原因"的可核查证据。
+
+    ⚠️ conflict 标签表示「主键冲突中被保留的那一条」：它进入清洗后数据集，
+       但**不等于已修正**，其取值仍是不可验证的（见 rules.json conflict_policy）。
 
     ⚠️ 必须以二进制方式读写：记录为 ISO-8859-1 字节，用文本模式会破坏编码。
 
-    返回 (clean+fixed 行数, fixed 行数, isolated 行数)
+    返回 dict：各标签的输出行数
     """
-    n_clean = n_fixed = n_iso = 0
+    n = {'clean': 0, 'fixed': 0, 'conflict': 0, 'isolated': 0, 'unknown': 0}
 
     with open(tagged_path, 'rb') as fin, \
          open(clean_path, 'wb') as fclean, \
-         open(iso_path, 'wb') as fiso:
+         open(iso_path, 'wb') as fiso, \
+         open(audit_path, 'wb') as faudit:
         for line in fin:
             raw = line.rstrip(b'\n').rstrip(b'\r')
             if raw == b'':
                 continue
-            parts = raw.split(b'\t', 1)
-            if len(parts) < 2:
+            parts = raw.split(b'\t', 2)
+            if len(parts) < 3:
+                n['unknown'] += 1
                 continue
-            tag, payload = parts[0], parts[1]
+            tag, reason, payload = parts[0], parts[1], parts[2]
 
-            if tag == b'clean':
+            if tag in (b'clean', b'fixed', b'conflict'):
                 fclean.write(payload + b'\n')
-                n_clean += 1
-            elif tag == b'fixed':
-                fclean.write(payload + b'\n')
-                n_fixed += 1
+                n[tag.decode('ascii')] += 1
+                if tag != b'clean':
+                    faudit.write(tag + b'\t' + reason + b'\t' + payload + b'\n')
             elif tag == b'isolated':
                 fiso.write(payload + b'\n')
-                n_iso += 1
-            # 其他标签已在调用方按 unknown_count 拦截
+                faudit.write(tag + b'\t' + reason + b'\t' + payload + b'\n')
+                n['isolated'] += 1
+            else:
+                n['unknown'] += 1
 
-    return n_clean, n_fixed, n_iso
+    return n
 
 
 def stage_after(args, task_id):
@@ -1016,6 +1158,40 @@ def stage_after(args, task_id):
     return response
 
 
+def stage_result(args, task_id):
+    """
+    从任务状态文件组装最终结果契约（接口规范第 13 节），不重跑任何作业。
+
+    用途：before / clean / after 已分阶段执行完成后，需要拿到完整结果 JSON 时，
+    不必再用 --stage all 把全流程重跑一遍（27 个 Hadoop 作业）。
+
+    对应接口：GET /api/tasks/{task_id}/result
+    """
+    state = load_state(task_id)
+    if not state or 'before_metrics' not in state:
+        raise StageError(
+            stage='RESULT', code=errors_mod.INVALID_REQUEST,
+            message='缺少任务状态，无法组装结果',
+            detail='请先执行 before / clean / after 阶段（或 --stage all）。',
+        )
+    if 'after_metrics' not in state:
+        # 只跑了 before：仍然可以给出 before-only 的结果契约（与 --stage all 的中间态一致）
+        if not args.quiet:
+            print('[driver] 阶段: RESULT（仅有 before 结果，After 字段为 null）')
+    result = build_result(
+        task_id,
+        state['before_metrics'],
+        state.get('before_scores', {}),
+        state.get('before_details', {}),
+        after_metrics=state.get('after_metrics'),
+        after_scores=state.get('after_scores'),
+        stats=state.get('clean_statistics'),
+    )
+    state['result'] = result
+    save_state(task_id, state)
+    return result
+
+
 def stage_all(args, task_id):
     """
     完整流程：before → clean → after，输出最终结果契约（接口规范第 13 节）。
@@ -1059,13 +1235,19 @@ def stage_all(args, task_id):
 def main():
     ap = argparse.ArgumentParser(
         description='MovieLens 数据治理 driver（对应 docs/接口规范文档.md 第 9-11 节）')
-    ap.add_argument('--stage', choices=['all', 'before', 'clean', 'after'], default='all',
+    ap.add_argument('--stage', choices=['all', 'before', 'clean', 'after', 'result'],
+                    default='all',
                     help='执行阶段：before=清洗前评分；clean=数据清洗；'
-                         'after=清洗后评分；all=一次跑完（默认，向后兼容）')
+                         'after=清洗后评分；result=仅按已保存状态组装最终结果（不跑作业）；'
+                         'all=一次跑完（默认，向后兼容）')
     ap.add_argument('--mode', choices=['local', 'hadoop'], default='local',
                     help='local=本机文件模拟（调试）；hadoop=提交 Hadoop Streaming 作业')
     ap.add_argument('--task-id', default=None, help='任务标识，默认按时间生成')
-    ap.add_argument('--data-dir', default=os.path.expanduser('~/data/ml-1m'))
+    ap.add_argument('--data-dir',
+                    default=os.environ.get('ML_DATA_DIR',
+                                           os.path.expanduser('~/data/ml-1m-v2')),
+                    help='原始数据目录（默认 ~/data/ml-1m-v2，即课程给定的 v2 数据；'
+                         'v1 为 GroupLens 官方未改动版本，已停用）')
     ap.add_argument('--work-dir', default='/tmp/mlqc-driver')
     ap.add_argument('--out', default=None, help='输出 JSON 路径（默认写入 reports/quality-report/）')
     ap.add_argument('--quiet', action='store_true')
@@ -1096,7 +1278,7 @@ def main():
     # 以便 Agent 按 error.code 分类处理。
     stage_label = {
         'before': 'BEFORE_SCORE', 'clean': 'CLEANING',
-        'after': 'AFTER_SCORE', 'all': 'BEFORE_SCORE',
+        'after': 'AFTER_SCORE', 'result': 'RESULT', 'all': 'BEFORE_SCORE',
     }[args.stage]
 
     try:
@@ -1106,6 +1288,8 @@ def main():
             result = stage_clean(args, task_id)
         elif args.stage == 'after':
             result = stage_after(args, task_id)
+        elif args.stage == 'result':
+            result = stage_result(args, task_id)
         else:
             result = stage_all(args, task_id)
     except SystemExit as e:
@@ -1154,6 +1338,15 @@ def main():
             for k in DIM_ORDER:
                 v = result['scores'].get(k)
                 print('   %-12s %s' % (k, ('%.4f' % v) if v is not None else 'N/A'))
+        elif args.stage == 'clean':
+            print(' 清洗统计')
+            print('=' * 62)
+            st = result.get('statistics', {})
+            for k in ('before_count', 'after_count', 'fixed_count',
+                      'deduplicated_count', 'isolated_count'):
+                print('   %-20s %s' % (k, st.get(k)))
+            print('   %-20s %s' % ('conflict_count', st.get('conflict_count')))
+            print('   %-20s %s' % ('conflict_key_count', st.get('conflict_key_count')))
         else:
             print(' 五维质量评分（Before）')
             print('=' * 62)

@@ -52,7 +52,7 @@ CONFIG_PATH = _RULES_CANDIDATES[0]
 SEP = b'::'
 ENCODING = 'latin-1'          # 即 ISO-8859-1 的 Python 名称
 
-# ratings 中 Timestamp 的合法区间（由实测得出，见 docs/evaluation-method.md 第 2.2 节）
+# ratings 中 Timestamp 的合法区间（默认值；init_rules() 会按 rules.json 覆盖）
 TS_MIN = 956703932            # 2000-04-25
 TS_MAX = 1046454590           # 2003-02-28
 
@@ -63,6 +63,16 @@ TS_MAX = 1046454590           # 2003-02-28
 GENRE_SET = None              # set[str] 合法 Genres 类别
 VALID_GENDER = frozenset()    # set[str] 合法性别编码
 VALID_AGE = frozenset()       # set[str] 合法年龄段编码
+
+# --- rule-v2 新增：解析容错、时间戳单位、标识符取值域、冲突策略 ---
+TS_MS_THRESHOLD = 100000000000          # 超过此值判为毫秒时间戳
+TOLERATED_SEPARATORS = (b',', b'|', b':')   # 被替换的分隔符候选（按此顺序尝试）
+EXTRA_FIELD_MARKERS = (b'EXTRA_FIELD',)     # 行尾多余字段的标记
+ZIP4_PATTERN = r'^(\d{5})-\d{4}$'           # ZIP+4，可确定性截取前 5 位
+ID_MIN = {}                   # {'users': 1, 'movies': 1, ...}
+ID_MAX = {}                   # {'users': 6040, 'movies': 3952}
+CONFLICT_POLICY = {}
+MATCH_YEAR_RE = None          # movies 标题年份正则（由 rules 编译）
 
 # 五维权重与必需字段定义
 WEIGHTS = {}
@@ -137,6 +147,8 @@ def init_rules(path=None):
     """
     global GENRE_SET, VALID_GENDER, VALID_AGE
     global WEIGHTS, REQUIRED_FIELDS, T1, T2, _RULES_LOADED
+    global TS_MIN, TS_MAX, TS_MS_THRESHOLD, TOLERATED_SEPARATORS
+    global EXTRA_FIELD_MARKERS, ZIP4_PATTERN, ID_MIN, ID_MAX, CONFLICT_POLICY
 
     if _RULES_LOADED:
         return
@@ -146,6 +158,27 @@ def init_rules(path=None):
     GENRE_SET = frozenset(cfg['genres']['valid'])
     VALID_GENDER = frozenset(cfg['users']['valid_gender'])
     VALID_AGE = frozenset(cfg['users']['valid_age'])
+
+    # --- rule-v2：解析与域规则也以 rules.json 为唯一来源 ---
+    r = cfg['ratings']
+    TS_MIN = int(r['timestamp_min'])
+    TS_MAX = int(r['timestamp_max'])
+    TS_MS_THRESHOLD = int(r.get('timestamp_ms_threshold', 100000000000))
+
+    p = cfg.get('parsing', {})
+    TOLERATED_SEPARATORS = tuple(s.encode('latin-1')
+                                 for s in p.get('tolerated_separators', [',', '|', ':']))
+    EXTRA_FIELD_MARKERS = tuple(m.encode('latin-1')
+                                for m in p.get('extra_field_markers', ['EXTRA_FIELD']))
+    ZIP4_PATTERN = cfg['users'].get('zipcode_extended_pattern', r'^(\d{5})-\d{4}$')
+
+    for tbl, dom in cfg.get('id_domains', {}).items():
+        if tbl.startswith('_'):
+            continue
+        ID_MIN[tbl] = int(dom['min'])
+        ID_MAX[tbl] = int(dom['max'])
+
+    CONFLICT_POLICY = cfg.get('conflict_policy', {})
 
     # 过滤掉 _comment 之类的说明性键，只保留真正的规则项。
     # （rules.json 中所有以 '_' 开头的键都是注释，不是数据。）
@@ -214,8 +247,72 @@ def rstrip_eol(line):
 
 
 def split_fields(line):
-    """按 b'::' 切分，返回字段列表（bytes）。"""
+    """按 b'::' 切分，返回字段列表（bytes）。
+
+    ⚠️ 这是【严格】切分，用于质量检查（before/after 评分口径）。
+    分隔符被替换过的行在这里会得到 1 个字段，从而被如实统计为结构异常。
+    清洗侧请使用 split_fields_tolerant()，它会在容错后尝试还原记录。
+    """
     return rstrip_eol(line).split(SEP)
+
+
+def split_fields_tolerant(line, ncol):
+    """
+    清洗用【容错】切分（rule-v2 新增）。
+
+    处理两类可确定性修复的解析问题：
+      1. 分隔符被替换：标准分隔符为 '::'，实际可能是 ',' / '|' / ':'
+      2. 行尾多余字段：如 `...::EXTRA_FIELD`
+
+    返回 (fields, repairs)：
+      fields   —— 字段列表；无法还原为 ncol 个字段时返回 None
+      repairs  —— 本次用到的修复动作名称列表（如 ['sep_replaced', 'extra_field']）
+
+    设计原则：只做"能确定原意"的还原。字段数不足（信息缺失）不在此处猜测，
+    由调用方判定为隔离。
+    """
+    repairs = []
+    raw = rstrip_eol(line)
+
+    if SEP in raw:
+        parts = raw.split(SEP)
+    else:
+        parts = None
+        for cand in TOLERATED_SEPARATORS:
+            if cand in raw:
+                parts = raw.split(cand)
+                repairs.append('sep_replaced')
+                break
+        if parts is None:
+            return None, repairs
+
+    # 行尾多余字段：仅当确实多出字段、且末字段是已知标记或空时才截断
+    while len(parts) > ncol and parts[-1] in EXTRA_FIELD_MARKERS:
+        parts = parts[:-1]
+        repairs.append('extra_field')
+    if len(parts) > ncol and parts[-1] == b'':
+        parts = parts[:-1]
+        repairs.append('extra_field')
+
+    if len(parts) != ncol:
+        return None, repairs
+    return parts, repairs
+
+
+def count_nonempty_fields(fields):
+    """非空字段个数，用于冲突消解时比较"信息完整度"。"""
+    return sum(1 for f in fields if f.strip() != b'')
+
+
+def in_id_domain(table, value):
+    """标识符是否落在 rules.json 声明的取值域内。"""
+    lo, hi = ID_MIN.get(table), ID_MAX.get(table)
+    if lo is None or hi is None:
+        return True
+    if not is_positive_int_str(value):
+        return False
+    v = parse_int(value)
+    return v is not None and lo <= v <= hi
 
 
 def parse_int(b):
@@ -297,7 +394,7 @@ def emit_float(name, value, digits=10):
 
     为什么需要单独的函数：
       整数指标用 emit() 的 %d 输出即可，但 freshness 均值这类值是实数
-      （实测 0.215385814245），若用 int() 截断会变成 0，导致该项得分被
+      （清洗后实测 0.212159），若用 int() 截断会变成 0，导致该项得分被
       错误计算为 0。
 
     digits 默认 10 位小数，足以表达本项目的浮点指标精度。

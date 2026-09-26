@@ -1,27 +1,29 @@
 {
   "_comment": "MovieLens 数据质量规则的唯一配置来源。Before 与 After 评分必须共用本文件，以保证评价口径一致。修改本文件等同于修改评分口径，须通知成员B与成员C。规则依据见 docs/evaluation-method.md 与 docs/接口规范文档.md。",
-  "rule_version": "rule-v1",
+  "rule_version": "rule-v2",
 
-  "_version_note": "数据版本命名规范见 docs/接口规范文档.md 第 16 节：原始数据 movielens-1m-v1，清洗后 movielens-1m-v1-clean-v1。",
-  "input_version": "movielens-1m-v1",
-  "output_version": "movielens-1m-v1-clean-v1",
-  "data_version": "movielens-1m-v1",
+  "_version_note": "数据版本命名规范见 docs/接口规范文档.md 第 16 节：原始数据 movielens-1m-v2，清洗后 movielens-1m-v2-clean-v1。v1 为 GroupLens 官方未改动版本，已停用（误用）；v2 为课程给定版本，含注入的数据质量问题。",
+  "_rule_v2_changelog": "相对 rule-v1 的口径变更：1) 新增解析容错（分隔符被替换、行尾多余字段）；2) 新增时间戳单位混淆（毫秒）识别与换算；3) 新增标识符取值域（users 1-6040 / movies 1-3952）判定；4) users 的 Gender/Age/Occupation 非法取值由 keep 改为 isolate；5) 新增主键冲突（多变体且均合法）的处置策略；6) 唯一性口径区分『完全重复』与『键冲突』。",
+  "input_version": "movielens-1m-v2",
+  "output_version": "movielens-1m-v2-clean-v1",
+  "data_version": "movielens-1m-v2",
 
   "time": {
     "_comment": "T1=训练期截止，T2=验证期截止，测试数据位于 T2 之后。由迭代一统一确定，后续迭代不得混用。",
-    "_derivation": "按 ratings 时间戳的实际分位数切分（70%/15%/15%），而非按时间跨度等分。原因：数据 90.4% 集中在 2000 年，按时间等分会得到极不平衡的划分（曾按时间 70% 位置试算，测试集仅占 0.76%，不足以支撑迭代二/三的模型评估）。",
+    "_derivation": "按【清洗后合法 ratings 记录】的时间戳实际分位数切分（70%/15%/15%），而非按时间跨度等分。原因：数据 90.4% 集中在 2000 年，按时间等分会得到极不平衡的划分。注意：分位数必须在清洗后口径上计算——原始数据含毫秒级/越界时间戳，直接用原始数据会导致切点被拉偏。",
     "split_rule": "时间分位数 70% / 85%",
     "T1": "2000-11-22",
     "T2": "2000-12-10",
     "T1_epoch": 974862386,
     "T2_epoch": 976422054,
     "expected_split": {
-      "train_ratio": 0.700,
-      "validate_ratio": 0.150,
-      "test_ratio": 0.150,
-      "train_count": 700146,
+      "_comment": "清洗后（996,113 条）实测划分。切点本身按官方口径记录集（1,000,209 条）的 70%/85% 分位数确定，该口径下为 700,148 / 150,031 / 150,030；v2 清洗后测试期少了 4,096 条（ratings 侧主键冲突整组隔离，全部落在测试期），因此比例略微偏移。迭代二/三必须使用本表口径。",
+      "train_ratio": 0.7029,
+      "validate_ratio": 0.1506,
+      "test_ratio": 0.1465,
+      "train_count": 700148,
       "validate_count": 150031,
-      "test_count": 150032
+      "test_count": 145934
     },
     "dataset_min_epoch": 956703932,
     "dataset_max_epoch": 1046454590,
@@ -29,8 +31,17 @@
     "dataset_max_date": "2003-02-28"
   },
 
+  "parsing": {
+    "_comment": "解析层规则（v2 新增）。分隔符异常与行尾多余字段属于可确定性修复的问题。",
+    "_separator_note": "标准分隔符为 ::。被替换为 , | : 时，若能还原出与标准结构一致的字段数，则判为可修复；否则隔离。",
+    "canonical_separator": "::",
+    "tolerated_separators": [",", "|", ":"],
+    "extra_field_markers": ["EXTRA_FIELD"],
+    "_extra_field_note": "行尾多出的字段（如 ::EXTRA_FIELD）不含业务信息，截断即可修复。"
+  },
+
   "genres": {
-    "_comment": "实测 movies.dat 中出现的全部 18 个类别，未出现未识别类别。注意是 Children's（带撇号），不是 Children。",
+    "_comment": "实测 movies.dat 中出现的全部 18 个类别。注意是 Children's（带撇号），不是 Children。",
     "valid": [
       "Action",
       "Adventure",
@@ -54,13 +65,14 @@
   },
 
   "users": {
-    "_comment": "UserID/Gender/Age/Occupation/Zip-code 的合法取值域，依据 ml-1m README 与实测分布。",
+    "_comment": "UserID/Gender/Age/Occupation/Zip-code 的合法取值域，依据 ml-1m README。v2 中非法取值一律隔离（v1 曾按 keep 处理，因为当时数据没有违规）。",
     "valid_gender": ["M", "F"],
     "valid_age": ["1", "18", "25", "35", "45", "50", "56"],
     "occupation_min": 0,
     "occupation_max": 20,
     "zipcode_pattern": "^[0-9]{5}$",
-    "zipcode_note": "Zip-code 必须按字符串处理，以保留前导零；实测 662 条含前导零。"
+    "zipcode_extended_pattern": "^(\\d{5})-\\d{4}$",
+    "zipcode_note": "Zip-code 必须按字符串处理，以保留前导零。ZIP+4（NNNNN-NNNN）可确定性截取前 5 位；其余非 5 位形式无法确定正确值，隔离。"
   },
 
   "movies": {
@@ -74,7 +86,16 @@
     "rating_max": 5,
     "rating_integer_only": true,
     "timestamp_min": 956703932,
-    "timestamp_max": 1046454590
+    "timestamp_max": 1046454590,
+    "_timestamp_note": "区间对应 2000-04-25 至 2003-02-28，由清洗后合法记录实测得出。",
+    "timestamp_ms_threshold": 100000000000,
+    "_timestamp_ms_note": "超过该阈值说明时间戳用了毫秒（如 1009669227000）。毫秒戳可确定性换算为秒（整除 1000）后校验，属修复；换算后仍越界则隔离。"
+  },
+
+  "id_domains": {
+    "_comment": "标识符取值域（v2 新增）。ml-1m 共 6040 位用户、3952 个电影 ID 位（实际 3883 部）。超出取值域的 ID 属于构造记录，且必然造成跨表关联断裂，直接隔离。注意：这是『域校验』，真正的引用完整性仍由 cross-users / cross-movies 作业独立验证。",
+    "users": {"min": 1, "max": 6040},
+    "movies": {"min": 1, "max": 3952}
   },
 
   "required_fields": {
@@ -100,6 +121,30 @@
     "movies_title": {"table": "movies", "key": ["MovieID"], "value": ["Title"], "metric": "c_movie_title_multi"},
     "movies_genres": {"table": "movies", "key": ["MovieID"], "value": ["Genres"], "metric": "c_movie_genres_multi"},
     "users_attrs": {"table": "users", "key": ["UserID"], "value": ["Gender", "Age", "Occupation", "Zip-code"], "metric": "c_user_attr_multi"}
+  },
+
+  "conflict_policy": {
+    "_comment": "主键冲突（同一业务主键出现多个不同取值）的处置策略，v2 新增。这是本项目的设计选择，不是数据本身能给出的答案，必须在报告中说明其局限。",
+    "_definition": "冲突 = 同一业务主键下存在 ≥2 条字段级合法但取值不同的记录。注意：字段级非法的变体已在 mapper 阶段隔离，不会进入冲突判定。",
+    "ratings": {
+      "action": "isolate",
+      "reason": "事实表冲突：评分事件无法判定真值。隔离不会造成引用断裂（没有其它表引用 ratings），代价仅为数据量减少；反之若『保留一条』，实测 95% 的冲突键会选中被注入的值，等于把可疑值写进清洗后数据集。依据：不确定就隔离，不得猜测。"
+    },
+    "users": {
+      "action": "keep_one",
+      "reason": "维表冲突：UserID 被 ratings 引用，整条删除会让原本合法的评分变成孤儿记录，代价高于保留一条可疑值。保留规则见 resolve_by，并在报告中如实注明该问题未解决。"
+    },
+    "movies": {
+      "action": "keep_one",
+      "reason": "维表冲突：MovieID 被 ratings 引用，理由同 users。"
+    },
+    "resolve_by": [
+      "1. 优先保留无修复动作（clean）的记录，其次为已修复（fixed）的记录",
+      "2. 同等条件下保留非空字段更多（信息更完整）的记录",
+      "3. 仍并列时保留字节序最小的一条，保证结果可复现"
+    ],
+    "unresolved": true,
+    "_unresolved_note": "凡进入本策略的记录，其取值都无法被验证：ratings 冲突整组隔离（数据代价已量化），users/movies 冲突保留一条但**不等于修正**。两类都必须计入未解决问题（conflict_key_count），并在报告中如实说明『去重/保留不等于修正』。"
   },
 
   "weights": {
