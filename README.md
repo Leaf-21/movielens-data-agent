@@ -56,25 +56,19 @@ movielens-data-agent/
 
 ## 数据说明
 
-原始数据**不上传仓库**（`.gitignore` 已排除 `*.zip`、`*.dat`）。**数据版本登记见 [data/DATASETS.md](data/DATASETS.md)**（含路径、行数、SHA256），后续迭代不得混用不同版本。
+原始数据**不上传仓库**（`.gitignore` 已排除 `*.zip`、`*.dat`），由每位成员在本地配置：
 
-| 版本 | 状态 | 说明 |
+1. `ml-1m.zip` 来源于**南京大学 Moodle 网站**发布的课程数据（本地存放于 `data/`），放入 `data/` 并解压；
+2. 解压后包含三个 `.dat` 文件（MovieLens 1M 格式），**无表头**、字段以 `::` 分隔、编码为 **ISO-8859-1**：
+
+| 文件 | 字段格式 | 内容（本地实测行数） |
 | --- | --- | --- |
-| `movielens-1m-v1` | 已停用 | GroupLens 官方 `ml-1m.zip`，未改动 |
-| `movielens-1m-v2` | **当前使用** | 课程给定版本，在官方数据基础上注入了数据质量问题（分隔符被替换、多余/缺失字段、非法取值、重复与冲突、毫秒时间戳、域外 ID） |
-| `movielens-1m-v2-clean-v1` | 当前使用 | v2 经本项目 Hadoop 清洗后的数据，对应规则版本 `rule-v2` |
+| `ratings.dat` | `UserID::MovieID::Rating::Timestamp` | 1,150,241 条评分及时间 |
+| `movies.dat` | `MovieID::Title::Genres` | 4,465 条电影记录，类型以 `\|` 分隔 |
+| `users.dat` | `UserID::Gender::Age::Occupation::Zip-code` | 6,946 位用户的性别、年龄段、职业、邮编 |
 
-> ⚠️ 迭代一最初误用了官方未改动的 v1，导致"15 项检查 13 项零违规"——数据本身没有问题，清洗实验也就失去意义。现已切换到 v2，并以 v1 作为"清洗是否无损还原"的对照基准。
-
-三个 `.dat` 文件字段格式（v1/v2 相同，**无表头**、字段以 `::` 分隔、编码为 **ISO-8859-1**）：
-
-| 文件 | 字段格式 | v2 原始行数 | 其中官方记录 |
-| --- | --- | --- | --- |
-| `ratings.dat` | `UserID::MovieID::Rating::Timestamp` | 1,150,241 | 1,000,209 |
-| `movies.dat` | `MovieID::Title::Genres` | 4,465 | 3,883 |
-| `users.dat` | `UserID::Gender::Age::Occupation::Zip-code` | 6,946 | 6,040 |
-
-注意：邮编按**字符串**处理以免丢失前导零；MovieID 不连续；读取需指定 ISO-8859-1 编码。
+3. 注意：邮编按**字符串**处理以免丢失前导零；MovieID 不连续；读取需指定 ISO-8859-1 编码。
+4. 本地数据集与 GroupLens 官方版行数不同（官方为 1,000,209 / 3,883 / 6,040），包含待清洗的质量问题记录，这正是本项目的评估与清洗对象；文件指纹（md5）与行数登记见 `agent/config/versions.json`，用于可复现性核对。
 
 ## 开发流程
 
@@ -82,29 +76,4 @@ movielens-data-agent/
 
 ## 运行环境与使用方法
 
-运行环境：Windows + WSL2（Ubuntu 22.04），JDK 11 + Hadoop 3.4.1（本地模式 `LocalJobRunner`，`fs.defaultFS=file:///`）。清洗与评分**全部通过 Hadoop Streaming 作业执行**。
-
-```bash
-# 0) 数据落位（详见 data/DATASETS.md）
-cp /mnt/c/Users/HP/OneDrive/Desktop/LLM/ml-1m/ml-1m/{ratings,movies,users}.dat ~/data/ml-1m-v2/
-
-# 1) 完整流程：清洗前评分 -> 数据清洗 -> 清洗后评分
-cd /mnt/c/Users/HP/OneDrive/Desktop/DaShuJu/lab2/movielens-data-agent
-python3 hadoop/src/driver.py --mode hadoop --stage all \
-  --task-id task_002 --data-dir ~/data/ml-1m-v2
-
-# 2) 也可分阶段执行（对应接口规范第 9-11 节）
-python3 hadoop/src/driver.py --mode hadoop --stage before --task-id task_002 --data-dir ~/data/ml-1m-v2
-python3 hadoop/src/driver.py --mode hadoop --stage clean  --task-id task_002 --data-dir ~/data/ml-1m-v2
-python3 hadoop/src/driver.py --mode hadoop --stage after  --task-id task_002 --data-dir ~/data/ml-1m-v2
-```
-
-产物：
-
-| 路径 | 内容 |
-| --- | --- |
-| `reports/quality-report/task_00N.json` | 完整结果契约（五维得分、问题清单、清洗统计、报告对象） |
-| `reports/quality-report/quality-report.md` | 数据质量评估报告（人工撰写，数字来自上述 JSON） |
-| `hadoop/output/clean/` | 清洗后数据集 |
-| `hadoop/output/isolated/` | 隔离数据集 |
-| `hadoop/output/audit/` | 逐条处置审计（`<处置>\t<原因>\t<记录>`），用于核查"改了什么、依据什么" |
+> 待迭代一核心开发完成后，在此补充：运行环境、安装方法、使用方法和测试结果。

@@ -27,6 +27,13 @@ __pycache__/
 .venv/
 venv/
 
+# Agent 运行产物（任务状态/结果快照，不入库）
+agent/runtime/
+
+# Hadoop 服务运行期写入的任务交接文件；保留任务参考件 task_001.json
+reports/quality-report/*
+!reports/quality-report/task_001.json
+
 # ===== Node / Frontend =====
 node_modules/
 dist/
