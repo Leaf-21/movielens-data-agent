@@ -1,9 +1,10 @@
 {
   "_comment": "Agent 侧版本登记表。【生效数值】（版本号本身、T1/T2、权重）一律以 hadoop/config/rules.json 为唯一来源，本文件只登记每个版本的含义、来源与产出方式，供需求解析与结果解释引用。新增版本时必须同时更新 rules.json 与本文件。",
+  "_deprecated_note": "本项目的 `movielens-1m-v1` 专指 GroupLens 官方未改动版本（1,000,209 / 3,883 / 6,040），迭代一曾误用，现已停用且不在服务端白名单内，因此**不在此登记**（登记了会让 Agent 通过校验却在本项目服务端被拒）。v1 仅作为清洗无损还原的对照基准，见 data/DATASETS.md。",
   "data_versions": {
-    "movielens-1m-v1": {
+    "movielens-1m-v2": {
       "kind": "raw",
-      "desc": "本项目使用的 MovieLens 1M 格式原始数据（未清洗），ratings.dat / movies.dat / users.dat；来源于南京大学 Moodle 网站发布的课程数据集",
+      "desc": "本项目使用的 MovieLens 1M 格式原始数据（未清洗），ratings.dat / movies.dat / users.dat；来源于南京大学 Moodle 网站发布的课程数据集，在官方数据基础上注入了待清洗的数据质量问题",
       "source": "南京大学 Moodle 网站（课程数据分发，本地 data/ml-1m.zip）",
       "fingerprint": {
         "md5_zip": "7a39ccfddf1a876f3e1225c4ef4d2523",
@@ -15,19 +16,19 @@
         "line_counts": { "ratings.dat": 1150241, "movies.dat": 4465, "users.dat": 6946, "total": 1161652 },
         "taken_at": "2026-09-26"
       },
-      "note": "行数与 GroupLens 官方版（1000209/3883/6040）不同；rules.json 中 T1/T2 与 expected_split 系按官方规模推导，切换到本版数据的口径需成员A在迭代一评审确认后重算",
+      "note": "行数与 GroupLens 官方版（1000209/3883/6040）不同，这是本项目的评估与清洗对象。T1/T2 已按【清洗后合法记录】的分位数重算并由成员A确认：仍为 2000-11-22 / 2000-12-10（974862386 / 976422054）；清洗后划分 700,148 / 150,031 / 145,934（测试期比官方口径少 4,096 条，为 ratings 侧主键冲突整组隔离所致）。口径依据见 data/DATASETS.md 与 reports/quality-report/task_002.json。",
       "consumed_by": "POST /hadoop/quality-score/before, POST /hadoop/clean"
     },
-    "movielens-1m-v1-clean-v1": {
+    "movielens-1m-v2-clean-v1": {
       "kind": "cleaned",
-      "desc": "rule-v1 清洗后的数据集（隔离记录不在其中，单独存放于 hadoop/output/isolated/）",
+      "desc": "rule-v2 清洗后的数据集（996,113 / 3,883 / 6,025；隔离记录不在其中，单独存放于 hadoop/output/isolated/）",
       "produced_by": "POST /hadoop/clean",
       "consumed_by": "POST /hadoop/quality-score/after；迭代二/三的训练与评估输入"
     }
   },
   "rule_versions": {
-    "rule-v1": {
-      "desc": "迭代一默认清洗与评分规则（五维定义、阈值、权重、T1/T2）",
+    "rule-v2": {
+      "desc": "迭代一清洗与评分规则（五维定义、阈值、权重、T1/T2；新增解析容错、时间戳单位、标识符取值域、Genres 域校验与主键冲突处置）",
       "defined_in": "hadoop/config/rules.json",
       "method_doc": "docs/evaluation-method.md"
     }

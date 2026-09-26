@@ -37,7 +37,7 @@ class TestHadoopTool(unittest.TestCase):
     # ---- 成功路径 ----
 
     def test_quality_score_before_success(self):
-        resp = self.tool.quality_score_before('task_x1', 'movielens-1m-v1')
+        resp = self.tool.quality_score_before('task_x1', 'movielens-1m-v2')
         self.assertEqual(resp['status'], 'SUCCESS')
         self.assertEqual(resp['scores']['accurate'], 99.0)
         # 五维齐全
@@ -45,8 +45,8 @@ class TestHadoopTool(unittest.TestCase):
             self.assertIn(d, resp['scores'])
 
     def test_clean_dataset_success(self):
-        self.tool.quality_score_before('task_x1', 'movielens-1m-v1')
-        resp = self.tool.clean_dataset('task_x1', 'movielens-1m-v1', 'rule-v1')
+        self.tool.quality_score_before('task_x1', 'movielens-1m-v2')
+        resp = self.tool.clean_dataset('task_x1', 'movielens-1m-v2', 'rule-v2')
         st = resp['statistics']
         # 修复/去重/隔离三个口径必须分别存在，不允许被合并成一个"处理数"
         for k in ('before_count', 'after_count', 'fixed_count',
@@ -58,7 +58,7 @@ class TestHadoopTool(unittest.TestCase):
         self.assertEqual(resp['scores']['consistent'], 98.3)
 
     def test_read_state_after_calls(self):
-        self.tool.quality_score_before('task_x1', 'movielens-1m-v1')
+        self.tool.quality_score_before('task_x1', 'movielens-1m-v2')
         state = self.tool.read_state('task_x1')
         self.assertIsNotNone(state)
         self.assertEqual(state['_state'], 'BEFORE_DONE')
@@ -86,15 +86,15 @@ class TestHadoopTool(unittest.TestCase):
     def test_business_failure_translated_to_exception(self):
         tool = self._new_tool('before')
         with self.assertRaises(HadoopToolError) as cm:
-            tool.quality_score_before('task_f1', 'movielens-1m-v1')
+            tool.quality_score_before('task_f1', 'movielens-1m-v2')
         self.assertEqual(cm.exception.stage, 'BEFORE_SCORE')
         self.assertEqual(cm.exception.code, 'QUALITY_SCORE_ERROR')
 
     def test_clean_failure_keeps_stage_and_code(self):
         tool = self._new_tool('clean')
-        tool.quality_score_before('task_f2', 'movielens-1m-v1')
+        tool.quality_score_before('task_f2', 'movielens-1m-v2')
         with self.assertRaises(HadoopToolError) as cm:
-            tool.clean_dataset('task_f2', 'movielens-1m-v1')
+            tool.clean_dataset('task_f2', 'movielens-1m-v2')
         self.assertEqual(cm.exception.stage, 'CLEANING')
         self.assertEqual(cm.exception.code, 'HADOOP_EXECUTION_ERROR')
         self.assertEqual(cm.exception.to_dict()['code'], 'HADOOP_EXECUTION_ERROR')
@@ -105,7 +105,7 @@ class TestHadoopTool(unittest.TestCase):
         srv.stop()  # 端口释放后再调用 -> 连接被拒
         tool = HadoopTool(base_url=url, timeout=5)
         with self.assertRaises(HadoopToolError) as cm:
-            tool.quality_score_before('task_c1', 'movielens-1m-v1')
+            tool.quality_score_before('task_c1', 'movielens-1m-v2')
         self.assertIn('无法连接 Hadoop 服务', cm.exception.message)
         self.assertEqual(cm.exception.code, 'HADOOP_EXECUTION_ERROR')
 

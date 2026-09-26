@@ -84,7 +84,7 @@ class TestAgentApi(unittest.TestCase):
 
     def _create(self, prompt='请使用默认规则清洗 MovieLens 1M，评估清洗前后的五个数据质量维度。',
                 **kw):
-        body = {'prompt': prompt, 'data_version': 'movielens-1m-v1'}
+        body = {'prompt': prompt, 'data_version': 'movielens-1m-v2'}
         body.update(kw)
         status, resp = self.post_json('/api/tasks', body)
         self.assertEqual(status, 200)
@@ -102,7 +102,7 @@ class TestAgentApi(unittest.TestCase):
     # ---------------- 参数校验（第 4/15 节）----------------
 
     def test_missing_prompt(self):
-        st, resp = self.post_json('/api/tasks', {'data_version': 'movielens-1m-v1'})
+        st, resp = self.post_json('/api/tasks', {'data_version': 'movielens-1m-v2'})
         self.assertEqual(st, 200)  # 业务失败按约定走 HTTP 200
         self.assertEqual(resp['status'], 'FAILED')
         self.assertEqual(resp['error']['code'], 'INVALID_REQUEST')
@@ -169,7 +169,7 @@ class TestAgentApi(unittest.TestCase):
         _, result = self.get_json('/api/tasks/%s/result' % created['task_id'])
         self.assertIsNone(result['after_score']['overall'])
         self.assertIsNone(result['statistics']['fixed_count'])
-        self.assertEqual(result['data_version'], 'movielens-1m-v1')
+        self.assertEqual(result['data_version'], 'movielens-1m-v2')
 
     # ---------------- 失败链路（第 6/15/23 节）----------------
 
@@ -245,8 +245,8 @@ class TestAgentApi(unittest.TestCase):
     def test_result_before_completion(self):
         # 直接塞一个 PENDING 记录（不过调度），result 接口只回状态不回数值
         tid = self.store.new_task_id()
-        self.store.create(tid, 'p', {'do_clean': True, 'data_version': 'movielens-1m-v1',
-                                     'rule_version': 'rule-v1', 'notes': []})
+        self.store.create(tid, 'p', {'do_clean': True, 'data_version': 'movielens-1m-v2',
+                                     'rule_version': 'rule-v2', 'notes': []})
         _, resp = self.get_json('/api/tasks/%s/result' % tid)
         self.assertEqual(resp['status'], 'PENDING')
         self.assertNotIn('before_score', resp)

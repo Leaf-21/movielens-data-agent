@@ -120,7 +120,7 @@ python3 agent/src/api.py --port 8090   # ML_HADOOP_URL 可覆盖A服务地址
 
 # 提交默认流程任务
 curl -X POST http://127.0.0.1:8090/api/tasks -H 'Content-Type: application/json' \
-  -d '{"prompt":"请使用默认规则清洗 MovieLens 1M，评估清洗前后的五个数据质量维度。","data_version":"movielens-1m-v1","rule_version":"default"}'
+  -d '{"prompt":"请使用默认规则清洗 MovieLens 1M，评估清洗前后的五个数据质量维度。","data_version":"movielens-1m-v2","rule_version":"default"}'
 
 # 轮询 / 取结果 / 追问
 curl http://127.0.0.1:8090/api/tasks/task_YYYYMMDD_0001
