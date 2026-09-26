@@ -60,6 +60,8 @@ OUT_DIR="${ML_OUT_DIR:-$HOME/mlqc-out}"         # 结果落地目录（始终为
 STREAMING_JAR="${ML_STREAMING_JAR:-${HADOOP_HOME:-/usr/local/hadoop}/share/hadoop/tools/lib/hadoop-streaming-3.4.1.jar}"
 ML_FS="${ML_FS:-file}"                          # file | hdfs
 
+SCORE="$SRC/score"                              # 打分相关 mapper（如新鲜度）
+
 # ---------------------------------------------------------------------------
 # 输入数据目录
 #   默认用 ML_DATA_DIR（原始数据）；
@@ -170,6 +172,26 @@ common_env_args=(
 # 作业派发
 # ---------------------------------------------------------------------------
 case "$JOB" in
+
+  # 零、时效性第二层：新鲜度（只读 ratings 的 Timestamp 列）
+  #     输出浮点值，因此不需 reducer 的整数补零逻辑，reducer 用 cat 即可
+  #     （每条 mapper 输出一行，合并即得总和；本机单 mapper 场景足够）
+  freshness-ratings)
+    OUT="$WORK_DIR/out/$JOB"
+    _ml_fs_rm "$OUT"
+    echo "[run_check] 时效性新鲜度计算（ratings）"
+    hadoop jar "$STREAMING_JAR" \
+      -D mapreduce.job.name="mlqc-$JOB" \
+      -D mapreduce.job.reduces=1 \
+      "${common_env_args[@]}" \
+      -input "$WORK_DIR/input/ratings.dat" \
+      -output "$OUT" \
+      -mapper "python3 freshness_mapper.py" \
+      -reducer "cat" \
+      -file "$SCORE/freshness_mapper.py" \
+      "${common_file_args[@]}"
+    _ml_fs_getmerge "$OUT" "$OUT_DIR/$JOB.txt"
+    ;;
 
   # 一、字段级格式检查
   format-ratings|format-movies|format-users)

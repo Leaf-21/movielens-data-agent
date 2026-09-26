@@ -284,11 +284,25 @@ def emit(name, value=1, dim=None):
     输出一条计数记录，格式固定为:  <指标名>\t<数值>
     reducer 依赖此格式，不要改。
 
-    dim 参数保留用于将来扩展，不参与输出。
+    value 必须是整数。需要输出浮点值（如新鲜度均值）请用 emit_float()。
     """
     if isinstance(value, bytes):
         value = to_text(value)
     sys.stdout.write('%s\t%d\n' % (name, int(value)))
+
+
+def emit_float(name, value, digits=10):
+    """
+    输出浮点指标，格式为: <指标名>\t<数值>
+
+    为什么需要单独的函数：
+      整数指标用 emit() 的 %d 输出即可，但 freshness 均值这类值是实数
+      （实测 0.215385814245），若用 int() 截断会变成 0，导致该项得分被
+      错误计算为 0。
+
+    digits 默认 10 位小数，足以表达本项目的浮点指标精度。
+    """
+    sys.stdout.write('%s\t%s\n' % (name, ('%.' + str(digits) + 'f') % float(value)))
 
 
 def read_counters(stream=None):
@@ -313,7 +327,13 @@ def read_counters(stream=None):
         else:
             continue
         try:
-            n = int(val)
+            # 优先按整数解析；失败则按浮点（如新鲜度合计 0.0000001234）。
+            # 两者都失败才跳过 —— 这样既保持整数指标的精确性，
+            # 又不会把浮点指标静默丢弃。
+            try:
+                n = int(val)
+            except ValueError:
+                n = float(val)
         except ValueError:
             continue
         out[key] = out.get(key, 0) + n

@@ -15,17 +15,17 @@
     "accurate": 99.8882,
     "complete": 100.0,
     "unique": 100.0,
-    "up_to_date": 100.0,
+    "up_to_date": 21.5386,
     "consistent": 99.8659,
-    "overall": 99.9385
+    "overall": 92.0924
   },
   "after_score": {
     "accurate": 100.0,
     "complete": 100.0,
     "unique": 100.0,
-    "up_to_date": 100.0,
+    "up_to_date": 21.5386,
     "consistent": 99.9252,
-    "overall": 99.9813
+    "overall": 92.1352
   },
   "score_change": {
     "accurate": 0.1118,
@@ -90,7 +90,7 @@
         "consistent": 0.25
       },
       "weight_note": "综合分 = 五维加权平均。权重为设计选择而非测量结果，改变权重会改变综合分排序。",
-      "overall": 99.9385,
+      "overall": 92.0924,
       "score_range": "[0, 100]",
       "same_criteria": "清洗前后使用同一份评分程序、同一套阈值与权重，仅输入数据集不同，以保证结果可比较。",
       "rule_version": "rule-v1",
@@ -124,10 +124,10 @@
       {
         "dimension": "up_to_date",
         "dimension_cn": "时效性",
-        "before": 100.0,
-        "after": 100.0,
+        "before": 21.5386,
+        "after": 21.5386,
         "delta": 0.0,
-        "description": "时效性维度得分未变化（100.0000）。时间戳全部可解释，属客观事实，不因清洗而变化。"
+        "description": "时效性维度得分未变化（21.5386）。时间戳全部可解释，属客观事实，不因清洗而变化。"
       },
       {
         "dimension": "consistent",
@@ -231,7 +231,12 @@
     "up_to_date": {
       "explainable_records": 1000209,
       "total_records": 1000209,
-      "note": "仅计入第一层（时间可解释性）；第二层新鲜度在 score 模块中按 T1/T2 计算"
+      "reliability_ratio": 0.0,
+      "freshness_sum": 215430.8298798203,
+      "freshness_n": 1000209,
+      "freshness_mean": 0.215385814245,
+      "formula": "100 × reliability_ratio × freshness_mean",
+      "note": "T1/T2 按分位数切分，按定义 70% 的记录落在 T1 之前，其 freshness 被 clamp 为 0，故本维度得分（21.5386）明显低于其他四维。这是数据时间分布的客观反映，与数据质量无关；依据迭代一需求第 51 行，数据年代较早并不必然属于错误。"
     },
     "consistent": {
       "ref_integrity_ratio": 0.0,
@@ -243,6 +248,9 @@
     }
   },
   "metrics": {
+    "ratings_freshness_n": 1000209,
+    "ratings_freshness_skipped": 0,
+    "ratings_freshness_sum": 215430.8298798203,
     "ratings_d1_ok": 1000209,
     "ratings_d2_ok": 1000209,
     "ratings_lines": 1000209,

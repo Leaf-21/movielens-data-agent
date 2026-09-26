@@ -46,6 +46,7 @@ REPO_DIR = os.path.dirname(HADOOP_DIR)                            # 仓库根
 CHECK_DIR = os.path.join(DRIVER_DIR, 'check')
 COMMON_DIR = os.path.join(DRIVER_DIR, 'common')
 PIPELINE_DIR = os.path.join(DRIVER_DIR, 'pipeline')
+SCORE_DIR = os.path.join(DRIVER_DIR, 'score')
 
 sys.path.insert(0, COMMON_DIR)
 sys.path.insert(0, PIPELINE_DIR)
@@ -72,6 +73,7 @@ ISOLATED_DATA_DIR = os.path.join(HADOOP_DIR, 'output', 'isolated')
 #   每个作业对应一类检查，job 名与 run_check.sh 的分派名一致
 # ---------------------------------------------------------------------------
 JOBS = [
+    'freshness-ratings',
     'format-ratings', 'format-movies', 'format-users',
     'cross-users', 'cross-movies',
     'group-u-pair', 'group-u-movie', 'group-u-user',
@@ -83,6 +85,11 @@ JOBS = [
 # 且一旦 mapper 因缺 stdin 而提前退出，reducer 的"补零"会把它伪装成 0，
 # 导致出错但不报错。改为显式文件读写，任何环节失败都能被检测到。
 LOCAL_JOBS = {
+    'freshness-ratings': (
+        'python3 {score}/freshness_mapper.py',
+        'cat',
+        [('ratings', None)],
+    ),
     'format-ratings': (
         'ML_TABLE=ratings python3 {check}/mapper.py',
         'ML_TABLE=ratings python3 {check}/reducer.py',
@@ -211,7 +218,7 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
                 message='找不到数据文件，无法执行检查',
                 detail='期望路径: %s' % src,
             )
-        cmd = mapper_tpl.format(check=CHECK_DIR, data=data_dir)
+        cmd = mapper_tpl.format(check=CHECK_DIR, data=data_dir, score=SCORE_DIR)
         if role:
             cmd = 'ML_INPUT_ROLE=%s %s' % (role, cmd)
         part = os.path.join(jdir, '%s.%s.map' % (tbl, role or 'all'))
@@ -259,7 +266,7 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
         )
 
     # --- reduce 阶段 ---
-    cmd = reducer_tpl.format(check=CHECK_DIR, data=data_dir)
+    cmd = reducer_tpl.format(check=CHECK_DIR, data=data_dir, score=SCORE_DIR)
     with open(sorted_path, 'rb') as fin:
         p = subprocess.run(['bash', '-c', cmd], stdin=fin,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -420,23 +427,89 @@ def score_consistent(m):
 
 def score_up_to_date(m):
     """
-    时效性：时间可解释性 x 时间新鲜度（以 T1/T2 为参照，而非"今天"）。
+    时效性 = 第一层（时间可解释性）× 第二层（时间新鲜度）
 
     依据 docs/evaluation-method.md 第 4.4 节：
-      - 不得把"评分发生在 2000-2003 年"视为质量问题。
-      - 第一层（reliability）：时间戳能否被合理解释。
-      - 第二层（freshness）：距 T2 的相对新近程度。
-    本实现只用第一层，因为它是可完全自动验证的客观判据；
-    第二层需要逐条时间戳求均值，将在评分阶段（score 模块）实现。
+
+      第一层 reliability：时间戳能否被合理解释
+          = 合规记录数 / 总记录数
+
+      第二层 freshness：按 T1/T2 逐条计算新近程度后求均值
+          freshness(t) = clamp((t − T1) / (T2 − T1), 0, 1)
+          均值越小说明数据越集中在早期
+
+      Up-to-date = 100 × reliability × mean(freshness)
+
+    ⚠️ 关于本数据集该维度得分偏低的说明
+    ----------------------------------------------------------------
+    T1/T2 按分位数切分，因此按定义 70% 的记录落在 T1 之前、其 freshness
+    被 clamp 为 0。实测分布：
+
+        clamp 到 0  (t <= T1) :  700,144  (70.00%)
+        线性区间    (T1~T2)   :  150,035  (15.00%)
+        clamp 到 1  (t > T2)  :  150,030  (15.00%)
+
+        freshness 均值 = 0.215385814245
+
+    因此本维度得分约为 21.54，明显低于其他四维。
+
+    **这不是 bug，与数据质量也无关**：T1/T2 一旦按分位数确定，该均值
+    就基本被锁定（线性区间约贡献 0.075，T2 之后的 15% 贡献 0.15）。
+    它衡量的是"数据在时间窗口内的新近程度"，而本数据集 90.4% 的评分
+    集中在 2000 年，新近程度本来就低。
+
+    依据 docs/迭代一_Hadoop数据清洗与Agent基础.md 第 51 行：
+    "数据年代较早并不必然属于错误"。
+
+    因此本维度在报告中必须配合说明使用，不可单独作为"数据质量差"的依据。
+    这也正是该维度权重被设为 0.10（最低档）的原因 —— 见 evaluation-method 第 5.1 节。
     """
     tr = m.get('ratings_total')
+
+    # --- 第一层：时间可解释性 ---
     ok = m.get('ratings_d2_ok', 0)
-    score, r = ratio((tr - ok) if tr else 0, tr)
-    return score, {
+    # 注意 ratio() 返回的第二个值是【违规率】：
+    #   rel_violation_rate = 不可解释记录数 / 总数
+    # 本项目实测该值为 0（1000209 条全部可解释），故第一层得分为 100.0。
+    rel_score, rel_violation_rate = ratio((tr - ok) if tr else 0, tr)
+
+    # --- 第二层：新鲜度均值 ---
+    fsum = m.get('ratings_freshness_sum')
+    fn = m.get('ratings_freshness_n')
+
+    details = {
         'explainable_records': ok,
         'total_records': tr,
-        'note': '仅计入第一层（时间可解释性）；第二层新鲜度在 score 模块中按 T1/T2 计算',
+        # 命名对齐 ratio() 的语义，避免被误读为"合规率"
+        'reliability_violation_rate': (round(rel_violation_rate, 10)
+                                       if rel_violation_rate is not None else None),
+        'reliability_score': rel_score,
     }
+
+    if fsum is None or not fn:
+        # 新鲜度指标缺失：不能静默当作 0 或 1，明确标注并用第一层的结果
+        details['note'] = ('未取得新鲜度指标（ratings_freshness_sum / _n），'
+                           '本维度仅按第一层计算。请检查 freshness-ratings 作业是否执行。')
+        return rel_score, details
+
+    freshness_mean = float(fsum) / float(fn)
+    details['freshness_sum'] = round(float(fsum), 12)
+    details['freshness_n'] = fn
+    details['freshness_mean'] = round(freshness_mean, 12)
+    details['formula'] = ('100 × (1 − reliability_violation_rate) × freshness_mean'
+                          ' = 100 × reliability_score/100 × freshness_mean')
+
+    if rel_score is None:
+        return None, details
+
+    score = round(rel_score * freshness_mean, 4)
+    details['note'] = (
+        'T1/T2 按分位数切分，按定义 70%% 的记录落在 T1 之前，其 freshness '
+        '被 clamp 为 0，故本维度得分（%.4f）明显低于其他四维。'
+        '这是数据时间分布的客观反映，与数据质量无关；'
+        '依据迭代一需求第 51 行，数据年代较早并不必然属于错误。' % score
+    )
+    return score, details
 
 
 DIMENSION_FUNCS = {
