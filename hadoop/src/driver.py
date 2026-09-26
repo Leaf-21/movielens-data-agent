@@ -56,6 +56,7 @@ import errors as errors_mod
 from errors import StageError
 
 RUN_CHECK_SH = os.path.join(HADOOP_DIR, 'scripts', 'run_check.sh')
+RUN_CLEAN_SH = os.path.join(HADOOP_DIR, 'scripts', 'run_clean.sh')
 
 # 五个维度的字段名与顺序（依据接口规范第 12 节）
 DIM_ORDER = ('accurate', 'complete', 'unique', 'up_to_date', 'consistent')
@@ -145,25 +146,32 @@ TABLE_FILE = {
 # 作业执行
 # ---------------------------------------------------------------------------
 
-def run_hadoop_job(job, work_dir, verbose=True):
-    """通过 run_check.sh 提交一个 Hadoop Streaming 作业，返回其输出文本。"""
+def run_hadoop_job(job, work_dir, verbose=True, data_dir=None, stage='BEFORE_SCORE'):
+    """
+    通过 run_check.sh 提交一个 Hadoop Streaming 作业，返回其输出文本。
+
+    data_dir  覆盖检查作业的输入目录（after 阶段用于对清洗后数据评分）
+    stage     出错时写入错误响应的阶段名（BEFORE_SCORE / AFTER_SCORE）
+    """
     if verbose:
         print('  [hadoop] %s ...' % job, flush=True)
     env = os.environ.copy()
     env['ML_OUT_DIR'] = work_dir
+    if data_dir:
+        env['ML_INPUT_DIR'] = data_dir
     p = subprocess.run(['bash', RUN_CHECK_SH, job],
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                        env=env, cwd=REPO_DIR)
     out_file = os.path.join(work_dir, job + '.txt')
     if p.returncode != 0:
         raise StageError(
-            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            stage=stage, code=errors_mod.HADOOP_EXECUTION_ERROR,
             message='Hadoop 作业执行失败：%s' % job,
             detail=p.stdout.decode('utf-8', 'replace')[-4000:],
         )
     if not os.path.exists(out_file):
         raise StageError(
-            stage='BEFORE_SCORE', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            stage=stage, code=errors_mod.HADOOP_EXECUTION_ERROR,
             message='Hadoop 作业 %s 未产生输出文件' % job,
             detail='期望路径: %s' % out_file,
         )
@@ -268,12 +276,18 @@ def run_local_job(job, data_dir, work_dir, verbose=True):
 # 指标汇总与评分
 # ---------------------------------------------------------------------------
 
-def collect_metrics(mode, work_dir, data_dir, verbose=True):
-    """运行全部作业并汇总指标。"""
+def collect_metrics(mode, work_dir, data_dir, verbose=True, stage='BEFORE_SCORE'):
+    """
+    运行全部作业并汇总指标。
+
+    data_dir 可指向原始数据或清洗后数据；stage 用于错误响应的阶段名，
+    使 after 阶段的失败能被正确归类为 AFTER_SCORE 而非 BEFORE_SCORE。
+    """
     metrics = {}
     for job in JOBS:
         if mode == 'hadoop':
-            text = run_hadoop_job(job, work_dir, verbose)
+            text = run_hadoop_job(job, work_dir, verbose,
+                                  data_dir=data_dir, stage=stage)
         else:
             text = run_local_job(job, data_dir, work_dir, verbose)
         got = ml.read_counters(text.splitlines())
@@ -285,7 +299,7 @@ def collect_metrics(mode, work_dir, data_dir, verbose=True):
             key = tbl + '_total'
             if not got.get(key):
                 raise StageError(
-                    stage='BEFORE_SCORE', code=errors_mod.QUALITY_SCORE_ERROR,
+                    stage=stage, code=errors_mod.QUALITY_SCORE_ERROR,
                     message='作业 %s 未报告有效记录数，结果不可信' % job,
                     detail='指标 %s 的值为 %r，说明 mapper 没有读到输入数据，'
                            '拒绝输出这样的结果。' % (key, got.get(key)),
@@ -294,7 +308,7 @@ def collect_metrics(mode, work_dir, data_dir, verbose=True):
         dup = set(got) & set(metrics)
         if dup:
             raise StageError(
-                stage='BEFORE_SCORE', code=errors_mod.QUALITY_SCORE_ERROR,
+                stage=stage, code=errors_mod.QUALITY_SCORE_ERROR,
                 message='指标名冲突，无法安全汇总',
                 detail='作业 %s 与之前重复的指标: %r' % (job, sorted(dup)),
             )
@@ -654,16 +668,223 @@ def stage_clean(args, task_id):
         {"task_id", "status", "input_version", "output_version",
          "rule_version", "statistics": {五个字段}}
 
-    ⚠️ 尚未实现。按接口规范第 2.2 节与第 15 节，此处抛出结构化错误，
-       由 main() 输出 FAILED 响应，不返回任何占位统计。
+    执行流程：
+      1. 对三张表分别提交 Hadoop Streaming 清洗作业（run_clean.sh）
+      2. 读取带处置标签的输出，按标签分流：
+           clean + fixed -> 清洗后数据集（hadoop/output/clean/）
+           isolated      -> 隔离数据集  （hadoop/output/isolated/）
+      3. 汇总统计并写入任务状态，供 after 阶段使用
+
+    ⚠️ "修复"与"隔离"的区分贯穿始终：
+       修复的记录进入主数据集并计入 fixed_count；
+       隔离的记录移出主数据集、单独保存并计入 isolated_count。
+       二者不合并、不互相表述（依据迭代一需求第 91 行）。
     """
-    raise StageError(
-        stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
-        message='数据清洗功能尚未实现，无法执行清洗',
-        detail='接口契约已按 docs/接口规范文档.md 第 10 节预留，'
-               '清洗作业开发中（对应 Issue #3）。'
-               '按接口规范第 2.2 节，未实现时明确失败而不返回占位结果。',
-    )
+    state = load_state(task_id) or {}
+    cfg = ml.load_rules()
+
+    if not args.quiet:
+        print('[driver] 阶段: CLEANING（数据清洗）')
+
+    # --- 准备输出目录 ---
+    for d in (CLEAN_DATA_DIR, ISOLATED_DATA_DIR):
+        os.makedirs(d, exist_ok=True)
+
+    work_dir = os.path.join(args.work_dir, 'clean')
+    os.makedirs(work_dir, exist_ok=True)
+
+    counts = {'clean_count': 0, 'fixed_count': 0, 'isolated_count': 0,
+              'deduplicated_count': 0, 'unknown_count': 0}
+    after_total = 0
+    before_total = 0
+
+    for table in ('ratings', 'movies', 'users'):
+        tagged, c = _run_clean_job(table, work_dir, args, verbose=not args.quiet)
+
+        # 分流：clean 与 fixed 进入主数据集，isolated 单独保存
+        clean_path = os.path.join(CLEAN_DATA_DIR, TABLE_FILE[table])
+        iso_path = os.path.join(ISOLATED_DATA_DIR, TABLE_FILE[table])
+
+        n_clean, n_fixed, n_iso = _split_tagged(tagged, clean_path, iso_path)
+
+        for k in ('clean_count', 'fixed_count', 'isolated_count', 'unknown_count'):
+            counts[k] += c.get(k, 0)
+        after_total += n_clean + n_fixed
+        before_total += (n_clean + n_fixed + n_iso)
+
+        if not args.quiet:
+            print('         %-8s clean=%-8d fixed=%-5d isolated=%-5d'
+                  % (table, n_clean, n_fixed, n_iso))
+
+    # --- 一致性校验：分流后总数必须等于清洗作业报告的总数 ---
+    reported_total = (counts['clean_count'] + counts['fixed_count']
+                      + counts['isolated_count'] + counts['unknown_count'])
+    if before_total != reported_total:
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗结果行数与作业统计不一致，结果不可信',
+            detail='分流后 %d 行，作业报告 %d 行' % (before_total, reported_total),
+        )
+    if counts['unknown_count']:
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗输出中存在无法识别的标签',
+            detail='unknown_count=%d，说明 mapper/reducer 契约被破坏'
+                   % counts['unknown_count'],
+        )
+    if after_total <= 0:
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗后数据集为空，结果不可信',
+        )
+
+    # --- 去重：业务主键重复在清洗 mapper 中未被单独处置 ---
+    # 实测 ratings 的 (UserID, MovieID) 无重复（见 Issue #2），此处如实记录为 0。
+    # 若后续数据出现重复，需在清洗规则中显式增加去重处置后再更新此值。
+    counts['deduplicated_count'] = 0
+
+    stats = {
+        'before_count': before_total,
+        'after_count': after_total,
+        'fixed_count': counts['fixed_count'],
+        'deduplicated_count': counts['deduplicated_count'],
+        'isolated_count': counts['isolated_count'],
+    }
+
+    # --- 写入任务状态，供 after 阶段读取 ---
+    state.update({
+        '_state': 'CLEAN_DONE',
+        'data_version': cfg['output_version'],
+        'rule_version': cfg['rule_version'],
+        'clean_statistics': stats,
+        'clean_data_dir': CLEAN_DATA_DIR,
+        'isolated_data_dir': ISOLATED_DATA_DIR,
+    })
+    save_state(task_id, state)
+
+    if not args.quiet:
+        print('')
+        print('         before_count=%d  after_count=%d  fixed=%d  dedup=%d  isolated=%d'
+              % (stats['before_count'], stats['after_count'], stats['fixed_count'],
+                 stats['deduplicated_count'], stats['isolated_count']))
+        print('         清洗后数据: %s' % CLEAN_DATA_DIR)
+        print('         隔离数据  : %s' % ISOLATED_DATA_DIR)
+
+    # 接口响应（严格按第 10 节契约）
+    return {
+        'task_id': task_id,
+        'status': 'SUCCESS',
+        'input_version': cfg['input_version'],
+        'output_version': cfg['output_version'],
+        'rule_version': cfg['rule_version'],
+        'statistics': {
+            'before_count': stats['before_count'],
+            'after_count': stats['after_count'],
+            'fixed_count': stats['fixed_count'],
+            'deduplicated_count': stats['deduplicated_count'],
+            'isolated_count': stats['isolated_count'],
+        },
+    }
+
+
+def _run_clean_job(table, work_dir, args, verbose=True):
+    """
+    提交单表清洗作业，返回 (带标签输出文件路径, 统计字典)。
+
+    作业通过 run_clean.sh 执行；脚本会把带标签的输出落到
+    <work_dir>/<table>.tagged，统计落到 <work_dir>/<table>.counts。
+    """
+    if verbose:
+        print('         [hadoop] clean-%s ...' % table, flush=True)
+
+    env = os.environ.copy()
+    env['ML_OUT_DIR'] = work_dir
+    env['ML_WORK_DIR'] = os.path.join(work_dir, 'hdfs', table)
+    env['ML_DATA_DIR'] = args.data_dir
+    env.pop('ML_INPUT_DIR', None)   # 清洗始终以原始数据为输入
+
+    p = subprocess.run(['bash', RUN_CLEAN_SH, table],
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       env=env, cwd=REPO_DIR)
+    if p.returncode != 0:
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗作业执行失败：%s' % table,
+            detail=p.stdout.decode('utf-8', 'replace')[-4000:],
+        )
+
+    tagged = os.path.join(work_dir, table + '.tagged')
+    counts_file = os.path.join(work_dir, table + '.counts')
+
+    if not os.path.exists(tagged):
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗作业未产生数据输出：%s' % table,
+            detail='期望路径: %s' % tagged,
+        )
+    if not os.path.exists(counts_file):
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗作业未产生统计输出：%s' % table,
+            detail='期望路径: %s' % counts_file,
+        )
+
+    counts = {}
+    with open(counts_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            parts = line.rstrip('\n').split('\t')
+            if len(parts) == 2:
+                try:
+                    counts[parts[0]] = int(parts[1])
+                except ValueError:
+                    continue
+
+    if not counts:
+        raise StageError(
+            stage='CLEANING', code=errors_mod.HADOOP_EXECUTION_ERROR,
+            message='清洗统计文件为空或格式错误：%s' % table,
+        )
+    return tagged, counts
+
+
+def _split_tagged(tagged_path, clean_path, iso_path):
+    """
+    按标签把带标签输出分流为两个文件。
+
+    输入行格式：<标签>\t<记录原文>
+      clean / fixed  -> clean_path（清洗后数据）
+      isolated       -> iso_path（隔离数据）
+
+    ⚠️ 必须以二进制方式读写：记录为 ISO-8859-1 字节，用文本模式会破坏编码。
+
+    返回 (clean+fixed 行数, fixed 行数, isolated 行数)
+    """
+    n_clean = n_fixed = n_iso = 0
+
+    with open(tagged_path, 'rb') as fin, \
+         open(clean_path, 'wb') as fclean, \
+         open(iso_path, 'wb') as fiso:
+        for line in fin:
+            raw = line.rstrip(b'\n').rstrip(b'\r')
+            if raw == b'':
+                continue
+            parts = raw.split(b'\t', 1)
+            if len(parts) < 2:
+                continue
+            tag, payload = parts[0], parts[1]
+
+            if tag == b'clean':
+                fclean.write(payload + b'\n')
+                n_clean += 1
+            elif tag == b'fixed':
+                fclean.write(payload + b'\n')
+                n_fixed += 1
+            elif tag == b'isolated':
+                fiso.write(payload + b'\n')
+                n_iso += 1
+            # 其他标签已在调用方按 unknown_count 拦截
+
+    return n_clean, n_fixed, n_iso
 
 
 def stage_after(args, task_id):
@@ -684,13 +905,15 @@ def stage_after(args, task_id):
             detail='请先执行: --stage before --task-id %s' % task_id,
         )
 
-    clean_dir = CLEAN_DATA_DIR
-    if not os.path.isdir(clean_dir) or not os.listdir(clean_dir):
+    clean_dir = state.get('clean_data_dir') or CLEAN_DATA_DIR
+    missing = [t for t in ('ratings', 'movies', 'users')
+               if not os.path.exists(os.path.join(clean_dir, TABLE_FILE[t]))]
+    if missing:
         raise StageError(
             stage='AFTER_SCORE', code=errors_mod.DATA_NOT_FOUND,
             message='未找到清洗后数据集，无法执行清洗后评分',
-            detail='期望目录: %s。请先执行 --stage clean --task-id %s'
-                   '（clean 阶段尚未实现）' % (clean_dir, task_id),
+            detail='目录 %s 中缺少: %s。请先执行 --stage clean --task-id %s'
+                   % (clean_dir, ', '.join(missing), task_id),
         )
 
     cfg = ml.load_rules()
@@ -699,7 +922,7 @@ def stage_after(args, task_id):
         print('        数据目录: %s' % clean_dir)
 
     metrics = collect_metrics(args.mode, args.work_dir, clean_dir,
-                              verbose=not args.quiet)
+                              verbose=not args.quiet, stage='AFTER_SCORE')
     scores, details = build_scores(metrics)
 
     state.update({
@@ -721,32 +944,36 @@ def stage_after(args, task_id):
 
 
 def stage_all(args, task_id):
-    """一次跑完 before + after（clean 未实现时 after 为空），输出最终结果契约。"""
+    """
+    完整流程：before → clean → after，输出最终结果契约（接口规范第 13 节）。
+
+    三个阶段依次调用，每一步的产出写入任务状态，最后组装为完整结果。
+    Agent 也可以分别调用三个接口（接口规范第 9-11 节），二者等价。
+    """
     if not args.quiet:
-        print('[driver] 阶段: ALL（清洗前评分 + 最终结果组装）')
-        print('        注意：clean 阶段尚未实现，after_score 将为 null')
+        print('=' * 62)
+        print(' 完整流程：清洗前评分 -> 数据清洗 -> 清洗后评分')
+        print('=' * 62)
 
-    metrics = collect_metrics(args.mode, args.work_dir, args.data_dir,
-                              verbose=not args.quiet)
-    scores, details = build_scores(metrics)
+    # --- 阶段一：清洗前评分 ---
+    after_resp = stage_before(args, task_id)
 
+    # --- 阶段二：数据清洗 ---
+    clean_resp = stage_clean(args, task_id)
+
+    # --- 阶段三：清洗后评分 ---
+    after_resp = stage_after(args, task_id)
+
+    # --- 组装最终结果 ---
     state = load_state(task_id) or {}
-    state.update({
-        '_state': 'BEFORE_DONE',
-        'task_id': task_id,
-        'before_metrics': metrics,
-        'before_scores': scores,
-        'before_details': details,
-    })
-
-    after_metrics = state.get('after_metrics')
-    after_scores = state.get('after_scores')
-    stats = state.get('clean_statistics')
+    metrics = state['before_metrics']
+    scores = state['before_scores']
+    details = state['before_details']
 
     result = build_result(task_id, metrics, scores, details,
-                          after_metrics=after_metrics,
-                          after_scores=after_scores,
-                          stats=stats)
+                          after_metrics=state.get('after_metrics'),
+                          after_scores=state.get('after_scores'),
+                          stats=state.get('clean_statistics'))
     state['result'] = result
     save_state(task_id, state)
     return result

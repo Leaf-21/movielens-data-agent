@@ -60,7 +60,15 @@ OUT_DIR="${ML_OUT_DIR:-$HOME/mlqc-out}"         # 结果落地目录（始终为
 STREAMING_JAR="${ML_STREAMING_JAR:-${HADOOP_HOME:-/usr/local/hadoop}/share/hadoop/tools/lib/hadoop-streaming-3.4.1.jar}"
 ML_FS="${ML_FS:-file}"                          # file | hdfs
 
-for p in "$DATA_DIR/ratings.dat" "$DATA_DIR/movies.dat" "$DATA_DIR/users.dat"; do
+# ---------------------------------------------------------------------------
+# 输入数据目录
+#   默认用 ML_DATA_DIR（原始数据）；
+#   after 阶段需要对「清洗后数据」评分，此时由 ML_INPUT_DIR 覆盖。
+#   覆盖目录必须同样包含 ratings.dat / movies.dat / users.dat 三个文件。
+# ---------------------------------------------------------------------------
+INPUT_DIR="${ML_INPUT_DIR:-$DATA_DIR}"
+
+for p in "$INPUT_DIR/ratings.dat" "$INPUT_DIR/movies.dat" "$INPUT_DIR/users.dat"; do
   [ -f "$p" ] || { echo "[run_check] 找不到数据文件: $p" >&2; exit 1; }
 done
 [ -f "$STREAMING_JAR" ] || {
@@ -127,9 +135,10 @@ _ml_fs_mkdir "$WORK_DIR/input"
 _ml_fs_mkdir "$WORK_DIR/out"
 
 echo "[run_check] 文件系统模式: $ML_FS   工作目录: $WORK_DIR"
+echo "[run_check] 输入数据目录: $INPUT_DIR"
 
 for t in ratings movies users; do
-  _ml_fs_put "$DATA_DIR/$t.dat" "$WORK_DIR/input/$t.dat"
+  _ml_fs_put "$INPUT_DIR/$t.dat" "$WORK_DIR/input/$t.dat"
 done
 for t in ratings movies users; do
   _ml_fs_exists "$WORK_DIR/input/$t.dat" || {

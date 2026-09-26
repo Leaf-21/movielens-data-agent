@@ -1,10 +1,10 @@
 {
   "task_id": "task_001",
   "status": "SUCCESS",
-  "stage": "BEFORE_SCORE",
-  "data_version": "movielens-1m-v1",
+  "stage": "ALL",
+  "data_version": "movielens-1m-v1-clean-v1",
   "input_version": "movielens-1m-v1",
-  "output_version": null,
+  "output_version": "movielens-1m-v1-clean-v1",
   "rule_version": "rule-v1",
   "T1": "2000-11-22",
   "T2": "2000-12-10",
@@ -20,27 +20,26 @@
     "overall": 99.9385
   },
   "after_score": {
-    "accurate": null,
-    "complete": null,
-    "unique": null,
-    "up_to_date": null,
-    "consistent": null,
-    "overall": null
+    "accurate": 100.0,
+    "complete": 100.0,
+    "unique": 100.0,
+    "up_to_date": 100.0,
+    "consistent": 99.9252,
+    "overall": 99.9813
   },
   "score_change": {
-    "accurate": null,
-    "complete": null,
-    "unique": null,
-    "up_to_date": null,
-    "consistent": null
+    "accurate": 0.1118,
+    "complete": 0.0,
+    "unique": 0.0,
+    "up_to_date": 0.0,
+    "consistent": 0.0593
   },
   "statistics": {
     "before_count": 1010132,
-    "after_count": null,
-    "fixed_count": null,
-    "deduplicated_count": null,
-    "isolated_count": null,
-    "_note": "清洗尚未执行，After 相关统计为 null。执行 clean 阶段后填充。"
+    "after_count": 1010117,
+    "fixed_count": 66,
+    "deduplicated_count": 0,
+    "isolated_count": 15
   },
   "problems": [
     {
@@ -97,7 +96,48 @@
       "rule_version": "rule-v1",
       "evaluation_doc": "docs/evaluation-method.md"
     },
-    "improvements": [],
+    "improvements": [
+      {
+        "dimension": "accurate",
+        "dimension_cn": "准确性",
+        "before": 99.8882,
+        "after": 100.0,
+        "delta": 0.1118,
+        "description": "准确性维度得分由 99.8882 提升至 100.0000，变化 +0.1118。主要由于非法字段值被修复或隔离。"
+      },
+      {
+        "dimension": "complete",
+        "dimension_cn": "完整性",
+        "before": 100.0,
+        "after": 100.0,
+        "delta": 0.0,
+        "description": "完整性维度得分未变化（100.0000）。原始数据无必需字段缺失。"
+      },
+      {
+        "dimension": "unique",
+        "dimension_cn": "唯一性",
+        "before": 100.0,
+        "after": 100.0,
+        "delta": 0.0,
+        "description": "唯一性维度得分未变化（100.0000）。原始数据主键天然唯一，不存在重复记录，本维度没有可改进空间。"
+      },
+      {
+        "dimension": "up_to_date",
+        "dimension_cn": "时效性",
+        "before": 100.0,
+        "after": 100.0,
+        "delta": 0.0,
+        "description": "时效性维度得分未变化（100.0000）。时间戳全部可解释，属客观事实，不因清洗而变化。"
+      },
+      {
+        "dimension": "consistent",
+        "dimension_cn": "一致性",
+        "before": 99.8659,
+        "after": 99.9252,
+        "delta": 0.0593,
+        "description": "一致性维度得分由 99.8659 提升至 99.9252，变化 +0.0593。主要由于跨表关联断裂的记录被隔离，或格式不一致的字段被规范化。"
+      }
+    ],
     "unresolved": [
       {
         "code": "users_u_zip_bad",
