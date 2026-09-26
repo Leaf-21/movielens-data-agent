@@ -616,19 +616,11 @@ def build_result(task_id, metrics, scores, details, after_metrics=None,
 
     # 主键冲突属于"清洗无法解决"的问题：清洗只能保留一条，
     # 但保留哪一条并不等于知道真值，因此必须显式列为未解决问题。
-    if stats and stats.get('conflict_key_count'):
-        unresolved.append({
-            'code': 'clean_conflict_keys',
-            'dimension': 'consistent',
-            'action': 'dedupe',
-            'severity': 'medium',
-            'count': stats.get('conflict_key_count'),
-            'subject': '同一主键存在多条均合法但取值不同的记录，已保留其中一条',
-            'reason': '数据本身无法判定哪一条为真值；清洗只做了确定性选择，'
-                      '未解决问题。涉及记录 %d 条，被保留 %d 条。'
-                      % (stats.get('conflict_record_count', 0),
-                         stats.get('conflict_count', 0)),
-        })
+    # 该条由 problems.build_conflict_unresolved() 生成（单一事实来源，
+    # Agent 的 HTTP 链路会调用同一个函数，保证两边口径一致）。
+    _conflict_item = problems_mod.build_conflict_unresolved(stats)
+    if _conflict_item:
+        unresolved.append(_conflict_item)
 
     # --- report ---
     rep = report_mod.build_report(before_score, after_score, ml.WEIGHTS, cfg, unresolved)

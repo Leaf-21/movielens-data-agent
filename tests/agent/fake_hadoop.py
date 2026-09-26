@@ -35,7 +35,10 @@ BEFORE_SCORES = {'accurate': 99.0, 'complete': 100.0, 'unique': 100.0,
 AFTER_SCORES = {'accurate': 100.0, 'complete': 100.0, 'unique': 100.0,
                 'up_to_date': 50.0, 'consistent': 98.3, 'overall': 95.04}
 CLEAN_STATS = {'before_count': 1160, 'after_count': 1159,
-               'fixed_count': 4, 'deduplicated_count': 0, 'isolated_count': 1}
+               'fixed_count': 4, 'deduplicated_count': 0, 'isolated_count': 1,
+               # rule-v2 新增：主键冲突统计（接口规范第 13 节）
+               'conflict_count': 2, 'conflict_key_count': 2,
+               'conflict_record_count': 4}
 
 
 class FakeHadoop(BaseHTTPRequestHandler):

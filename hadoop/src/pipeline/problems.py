@@ -241,6 +241,40 @@ def summarize_by_action(problems):
     return out
 
 
+def build_conflict_unresolved(clean_stats):
+    """
+    生成「主键冲突未解决」这一条问题记录（rule-v2 新增）。
+
+    为什么必须由**清洗统计**而不是 after 指标生成：
+      清洗后每个业务主键只剩一条记录，after 指标里的"重复/冲突"天然为 0，
+      冲突事实只存在于清洗统计（conflict_key_count 等）中。
+      若不显式携带这条结论，前端与 Agent 解释会呈现"清洗后已无问题"——
+      而实际上有数千个主键的真值仍无法判定。
+
+    单一事实来源：driver（--stage all 路径）与 Agent（HTTP 链路）都调用本函数，
+    避免两边各写一份导致口径漂移。
+
+    clean_stats 为 None 或冲突数为 0 时返回 None。
+    """
+    if not clean_stats:
+        return None
+    n = int(clean_stats.get('conflict_key_count') or 0)
+    if n <= 0:
+        return None
+    return {
+        'code': 'clean_conflict_keys',
+        'dimension': 'consistent',
+        'action': 'dedupe',
+        'severity': 'medium',
+        'count': n,
+        'subject': '同一主键存在多条均合法但取值不同的记录，已保留其中一条',
+        'reason': ('数据本身无法判定哪一条为真值；清洗只做了确定性选择，'
+                   '该问题**未真正解决**。涉及记录 %d 条，被保留 %d 条。'
+                   % (int(clean_stats.get('conflict_record_count') or 0),
+                      int(clean_stats.get('conflict_count') or 0))),
+    }
+
+
 if __name__ == '__main__':
     # 便于单独调试：从 JSON 文件读入 metrics 并打印问题清单
     import json
