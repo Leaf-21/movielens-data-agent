@@ -78,44 +78,45 @@ License：根据项目要求决定
 
 # 四、项目目录结构
 
-建议使用统一的项目目录结构，避免三个人各自按照不同方式组织代码。
+项目采用统一的项目目录结构（与当前仓库实际结构一致），避免三个人各自按照不同方式组织代码。目录结构如需调整，须经团队确认后同步修改本节。
 
 ```text
 movielens-data-agent/
 │
-├── README.md
+├── README.md                        # 全项目唯一 README
+│
 ├── .gitignore
 │
-├── docs/
-│   ├── project-plan.md
-│   ├── team-work.md
-│   ├── github-guide.md
-│   └── evaluation-method.md
+├── .github/
+│   └── pull_request_template.md
 │
-├── hadoop/
+├── docs/                            # 项目文档统一存放于此
+│   ├── GitHub 团队协作开发指导文档.md
+│   ├── 迭代一项目分工文档.md
+│   ├── 引言_项目总体要求与汇报安排.md
+│   ├── 迭代一_Hadoop数据清洗与Agent基础.md
+│   └── 接口规范文档.md
+│
+├── hadoop/                          # 成员A：Hadoop 清洗与五维评分
 │   ├── src/
 │   ├── config/
-│   ├── scripts/
-│   └── README.md
+│   └── scripts/
 │
-├── agent/
+├── agent/                           # 成员B：Agent 后端与任务调度
 │   ├── src/
 │   ├── tools/
-│   ├── config/
-│   └── README.md
+│   └── config/
 │
-├── frontend/
+├── frontend/                        # 成员C：前端展示
 │   ├── src/
-│   ├── public/
-│   └── README.md
+│   └── public/
 │
 ├── tests/
 │   ├── hadoop/
 │   ├── agent/
 │   └── frontend/
 │
-├── data/
-│   └── README.md
+├── data/                            # 本地放置原始数据，不入库
 │
 └── reports/
     ├── quality-report/
@@ -124,9 +125,9 @@ movielens-data-agent/
 
 注意：
 
-**原始 MovieLens 1M 数据文件不建议直接上传到 GitHub 仓库。**
-
-`data/README.md` 中可以说明数据来源、文件名称、编码方式和使用方法，数据文件通过本地环境配置。
+1. **README 全项目只保留根目录一份。** 模块说明、数据来源、文件名称、编码方式和使用方法统一写入根 `README.md` 的对应章节，各子目录不单独建 README。
+2. **原始 MovieLens 1M 数据文件不上传到 GitHub 仓库**（`.gitignore` 已排除 `*.zip`、`*.dat` 等），数据文件通过本地环境配置，配置方法见根 `README.md` 的"数据说明"。
+3. 项目文档统一存放于 `docs/`，保留原有中文文件名。
 
 ------
 
