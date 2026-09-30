@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MovieLens 数据治理 Agent</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>MovieLens 数据治理 Agent</h1>
+  <span class="sub">Agent 驱动的 Hadoop 数据清洗与五维质量评估</span>
+  <span id="serviceState" class="sub" style="margin-left:auto">检查服务中…</span>
+</header>
+
+<main>
+
+  <!-- 1. 自然语言任务输入 -->
+  <section class="card">
+    <h2><span class="idx">1</span>自然语言任务输入</h2>
+    <textarea id="prompt" placeholder="请输入清洗与评估需求……"></textarea>
+    <div class="row">
+      <button id="submitBtn" class="primary">开始执行</button>
+      <label class="field">数据版本
+        <input id="dataVersion" value="movielens-1m-v2" spellcheck="false">
+      </label>
+      <label class="field">清洗规则版本
+        <input id="ruleVersion" value="default" spellcheck="false">
+      </label>
+    </div>
+    <div class="examples">
+      示例：
+      <a data-fill="请使用默认规则清洗 MovieLens 1M，评估清洗前后的五个数据质量维度。">完整清洗+评估</a> ·
+      <a data-fill="只评估原始 MovieLens 1M 的五维数据质量，不要清洗。">只评估不清洗</a> ·
+      <a data-fill="清洗 MovieLens 1M，并重点说明还有哪些问题无法解决。">关注未解决问题</a>
+    </div>
+    <div id="understandingBox" class="notice hidden"></div>
+  </section>
+
+  <!-- 2. 任务状态 -->
+  <section id="statusPanel" class="card hidden">
+    <h2><span class="idx">2</span>任务状态</h2>
+    <div class="status-line">
+      <span id="statusBadge" class="badge PENDING">—</span>
+      <span id="statusMsg" class="sub"></span>
+    </div>
+    <div id="stageBox" class="stages"></div>
+    <div id="metaGrid" class="meta-grid"></div>
+  </section>
+
+  <div id="taskPanel" class="hidden"></div>
+
+  <!-- 错误提示 -->
+  <div id="errorBox" class="error-box hidden"></div>
+
+  <!-- 3. 结果区 -->
+  <div id="resultPanel" class="hidden">
+
+    <section class="card">
+      <h2><span class="idx">3</span>五维质量评分对比</h2>
+      <table class="score">
+        <thead>
+          <tr>
+            <th>维度</th><th>清洗前</th><th>清洗后</th><th>变化</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="scoreBody"></tbody>
+        <tbody id="overallRow" class="hidden"><tr><td colspan="5"></td></tr></tbody>
+      </table>
+      <div id="overallBody" class="hidden"></div>
+      <div id="methodNote" class="sub" style="margin-top:12px;font-size:12.5px"></div>
+      <div id="resultNote" class="notice hidden" style="margin-top:12px"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="idx">4</span>数据与规则版本 · 时间边界</h2>
+      <div id="versionGrid" class="meta-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="idx">5</span>数据清洗结果</h2>
+      <div id="statGrid" class="stat-grid"></div>
+
+      <div id="perTableBox" class="hidden" style="margin-top:16px">
+        <div class="sub" style="font-size:12.5px;margin-bottom:6px">分表统计</div>
+        <table class="score">
+          <thead><tr>
+            <th>表</th><th>输入</th><th>清洗后</th><th>修复</th><th>去重</th><th>隔离</th>
+          </tr></thead>
+          <tbody id="perTableBody"></tbody>
+        </table>
+      </div>
+
+      <h2 style="margin-top:22px"><span class="idx">6</span>识别到的问题及处置</h2>
+      <div id="problemBox"></div>
+
+      <h2 style="margin-top:22px;color:var(--warn)"><span class="idx" style="background:var(--warn);color:#3b2400">!</span>
+        未解决问题（共 <span id="unresolvedCount">0</span> 项）</h2>
+      <div id="unresolvedBox"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="idx">7</span>评估报告</h2>
+      <div id="reportBox" class="report-block"></div>
+    </section>
+
+    <section class="card">
+      <h2><span class="idx">8</span>清洗后数据样例</h2>
+      <div id="sampleBox"></div>
+    </section>
+  </div>
+
+  <!-- 9. Agent 追问 -->
+  <section id="chatPanel" class="card hidden">
+    <h2><span class="idx">9</span>继续追问 Agent</h2>
+    <div id="chatLog" class="chat-log"></div>
+    <div class="chat-input">
+      <input id="askInput" placeholder="例如：为什么 Complete 提高了？删除了多少条数据？哪些数据被隔离了？">
+      <button id="askBtn" class="ghost">发送</button>
+    </div>
+    <div class="examples" style="margin-top:8px">
+      可尝试：
+      <a data-fill="为什么 Complete 提高了？">为什么 Complete 提高</a> ·
+      <a data-fill="删除了多少条数据？">删除/隔离了多少</a> ·
+      <a data-fill="哪些数据被隔离了？">哪些被隔离</a> ·
+      <a data-fill="为什么有些问题没有解决？">为什么有些问题没解决</a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Agent 驱动的 Hadoop 数据清洗与五维质量评估系统 · 成员C 前端 · 所有数值均来自实际执行结果
+</footer>
+
+<script src="js/api.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
