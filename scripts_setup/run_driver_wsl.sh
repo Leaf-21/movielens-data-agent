@@ -7,7 +7,7 @@
 # =============================================================================
 set -euo pipefail
 
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}"
+export JAVA_HOME="${JAVA_HOME:-$HOME/opt/jdk-17.0.20.1+1}"
 export HADOOP_HOME="${HADOOP_HOME:-$HOME/opt/hadoop}"
 export HADOOP_CONF_DIR="$HADOOP_HOME/etc/hadoop"
 export PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH"
@@ -17,7 +17,7 @@ REPO="${REPO:-$HOME/movielens-data-agent}"
 STAGE="${STAGE:-all}"
 MODE="${MODE:-hadoop}"
 TASK_ID="${TASK_ID:-task_demo_001}"
-DATA_DIR="${DATA_DIR:-$HOME/data/ml-1m-v2}"
+DATA_DIR="${DATA_DIR:-$REPO/data/ml-1m-v2}"
 WORK_DIR="${WORK_DIR:-$HOME/mlqc-work-driver}"
 
 echo "=================================================="

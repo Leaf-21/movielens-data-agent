@@ -3,7 +3,7 @@
 # 在 WSL (Ubuntu) 中安装 Hadoop 3.4.1，并配置本项目运行所需的环境
 #   - 下载解压到 ~/opt/hadoop
 #   - 写 ~/.bashrc 的 HADOOP_HOME / JAVA_HOME / PATH
-#   - 拷数据到 ~/data/ml-1m-v2
+#   - 拷数据到仓库内 data/ml-1m-v2
 # 幂等：可重复执行。
 # =============================================================================
 set -euo pipefail
@@ -12,7 +12,7 @@ HADOOP_VERSION=3.4.1
 HADOOP_MIRROR="https://repo.huaweicloud.com/apache/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz"
 OPT_DIR="$HOME/opt"
 HADOOP_HOME="$OPT_DIR/hadoop"
-DATA_DIR="$HOME/data/ml-1m-v2"
+DATA_DIR="$HOME/movielens-data-agent/data/ml-1m-v2"
 DATA_ZIP="/mnt/d/大三上/大数据分析/lab2/movielens-data-agent/../ml-1m.zip"  # 占位，稍后由参数覆盖
 
 echo "=================================================="
@@ -45,7 +45,9 @@ fi
 echo "[3/4] Streaming jar: $STREAMING_JAR  ✓"
 
 # ---- 4. 配置 ~/.bashrc ----
-JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"
+# 优先用 ~/opt 下解压的 JDK（课程环境实际位置），否则回退到系统 OpenJDK 11
+JAVA_HOME="$(ls -d "$HOME"/opt/jdk-* 2>/dev/null | head -1)"
+JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}"
 MARK_BEGIN="# >>> movielens-agent hadoop >>>"
 MARK_END="# <<< movielens-agent hadoop <<<"
 if ! grep -q "$MARK_BEGIN" "$HOME/.bashrc" 2>/dev/null; then

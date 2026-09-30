@@ -54,7 +54,7 @@ CHECK="$SRC/check"
 # ---------------------------------------------------------------------------
 # 可覆盖的环境变量
 # ---------------------------------------------------------------------------
-DATA_DIR="${ML_DATA_DIR:-$HOME/data/ml-1m}"
+DATA_DIR="${ML_DATA_DIR:-$(dirname "$HADOOP_DIR")/data/ml-1m-v2}"
 WORK_DIR="${ML_WORK_DIR:-$HOME/mlqc-work}"      # 工作目录（本地或 HDFS）
 OUT_DIR="${ML_OUT_DIR:-$HOME/mlqc-out}"         # 结果落地目录（始终为本地）
 STREAMING_JAR="${ML_STREAMING_JAR:-${HADOOP_HOME:-/usr/local/hadoop}/share/hadoop/tools/lib/hadoop-streaming-3.4.1.jar}"

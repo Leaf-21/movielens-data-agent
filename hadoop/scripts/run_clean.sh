@@ -40,7 +40,7 @@ HADOOP_DIR="$(dirname "$SCRIPT_DIR")"
 SRC="$HADOOP_DIR/src"
 CLEAN_DIR_SRC="$SRC/clean"
 
-DATA_DIR="${ML_DATA_DIR:-$HOME/data/ml-1m}"
+DATA_DIR="${ML_DATA_DIR:-$(dirname "$HADOOP_DIR")/data/ml-1m-v2}"
 # after 阶段可对清洗后数据再清洗（理论上不需要，但保持一致性）
 INPUT_DIR="${ML_INPUT_DIR:-$DATA_DIR}"
 WORK_DIR="${ML_WORK_DIR:-$HOME/mlqc-work-clean}"

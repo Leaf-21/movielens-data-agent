@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # =============================================================================
-# 把 MovieLens v2 数据从 Windows 拷到 WSL 的 ~/data/ml-1m-v2
-#   数据源：C:\Users\39424\Downloads\ml-1m.zip（已核对 SHA256 为 v2）
+# 把 MovieLens v2 数据解压到仓库内的 data/ml-1m-v2/
+#   数据源：优先仓库内 data/ml-1m.zip（课程分发，已核对 SHA256 为 v2），
+#   不存在时回退到 Windows 下载目录；也可用 ML_ZIP 指定任意 zip。
 # 幂等：可重复执行。
 # =============================================================================
 set -euo pipefail
 
-ZIP="/mnt/c/Users/39424/Downloads/ml-1m.zip"
-DEST="$HOME/data/ml-1m-v2"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ZIP="${ML_ZIP:-$REPO_DIR/data/ml-1m.zip}"
+[ -f "$ZIP" ] || ZIP="/mnt/c/Users/39424/Downloads/ml-1m.zip"
+DEST="$REPO_DIR/data/ml-1m-v2"
 
 # v2 的权威校验和（来自 data/DATASETS.md）
 declare -A SHA=(
@@ -23,7 +26,11 @@ fi
 
 echo "[1/3] 解压 $ZIP ..."
 TMP="$(mktemp -d)"
-unzip -q "$ZIP" -d "$TMP"
+if command -v unzip >/dev/null 2>&1; then
+  unzip -q "$ZIP" -d "$TMP"
+else
+  python3 -m zipfile -e "$ZIP" "$TMP"
+fi
 
 mkdir -p "$DEST"
 # zip 结构是 ml-1m/{ratings,movies,users}.dat

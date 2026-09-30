@@ -76,4 +76,44 @@ movielens-data-agent/
 
 ## 运行环境与使用方法
 
-> 待迭代一核心开发完成后，在此补充：运行环境、安装方法、使用方法和测试结果。
+### 环境要求
+
+- **Python ≥ 3.10**：三个服务（Hadoop 服务层 / Agent API / 前端）全部只用标准库，**零第三方依赖**；
+- **清洗任务额外需要**：WSL（Ubuntu）或 Linux 环境 + Hadoop 3.4.1 + JDK（8/11/17 均可）。只评估（不清洗）的任务无需 Hadoop；
+- 前端渲染测试可选装 Node（`tests/run_all.py` 会自动检测，无 Node 时跳过该块）。
+
+### 数据准备
+
+使用课程给定数据集 **movielens-1m-v2**（`data/ml-1m.zip` 解压）。服务默认读取仓库内 `data/ml-1m-v2/`（运行 `bash scripts_setup/install_data.sh` 一键解压并校验 SHA256），也可用 `--data-dir` 或环境变量 `ML_DATA_DIR` 指定；指纹与行数登记见 `agent/config/versions.json`。
+
+### 启动顺序（三件套）
+
+```bash
+# ① 成员A：Hadoop 服务层（8080）
+python3 hadoop/src/server.py --mode local --port 8080 --data-dir data/ml-1m-v2
+#    local=评估用本机模拟、清洗仍提交 Hadoop Streaming 作业（需 JAVA_HOME/HADOOP_HOME）；
+#    纯演示评估任务时无需 Hadoop。--mode hadoop 目前在部分 WSL 环境评估作业
+#    reduce 段异常（reducer 子进程 code 139），排查中，演示统一用 local。
+# ② 成员B：Agent API（8090）
+python3 agent/src/api.py --port 8090 --hadoop-url http://127.0.0.1:8080
+# ③ 成员C：前端静态服务 + 反向代理（8000）
+python3 frontend/src/serve.py --port 8000 --agent-url http://127.0.0.1:8090
+```
+
+浏览器访问 **http://localhost:8000** 即可使用。三个服务都有 `GET /health` 可用于自检。
+
+WSL 一键脚本（成员C提供）：`scripts_setup/install_hadoop.sh` → `sync_to_wsl.sh` → `start_all_wsl.sh`，停止用 `stop_all_wsl.sh`；注意脚本内路径按执行机环境可能需微调。演示口令与预期输出口径见 `docs/演示脚本.md`。
+
+### 验证与测试
+
+```bash
+python3 tests/run_all.py                    # 统一入口：hadoop/agent/frontend/一致性 四块
+python3 tests/frontend/smoke_demo.py        # 演示前冒烟（演练模式，无需真实数据）
+```
+
+迭代一实测结果：`tests/agent` 71 例全过；全链路（评估→清洗→再评估）在 WSL + Hadoop 3.4.1 实跑 SUCCESS，Agent 组装结果与成员A `task_002.json` 基准逐项一致；测试报告见 `reports/test-report/test-report.md`。
+
+### Windows 直跑注意事项
+
+- 8080/8090 可能落在系统保留端口段（绑定报 `WinError 10013`），改用 `--port 18080/18090`（前端 8000 同理可改 18000，`--agent-url`/`--hadoop-url` 随之调整）；
+- 清洗环节在 Windows 本机模式下存在路径兼容问题（driver 经 bash 调用），**完整清洗链路请在 WSL 中运行**。

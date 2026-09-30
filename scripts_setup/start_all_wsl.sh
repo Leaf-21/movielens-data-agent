@@ -8,14 +8,14 @@
 # =============================================================================
 set -euo pipefail
 
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}"
+export JAVA_HOME="${JAVA_HOME:-$HOME/opt/jdk-17.0.20.1+1}"
 export HADOOP_HOME="${HADOOP_HOME:-$HOME/opt/hadoop}"
 export HADOOP_CONF_DIR="$HADOOP_HOME/etc/hadoop"
 export PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH"
 export ML_STREAMING_JAR="$HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-3.4.1.jar"
 
 REPO="$HOME/movielens-data-agent"
-DATA_DIR="$HOME/data/ml-1m-v2"
+DATA_DIR="$REPO/data/ml-1m-v2"
 LOGS="$REPO/logs"
 mkdir -p "$LOGS" "$HOME/mlqc-server-work" "$HOME/mlqc-server-out"
 

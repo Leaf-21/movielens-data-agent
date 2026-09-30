@@ -6,14 +6,14 @@
 # =============================================================================
 set -euo pipefail
 
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk-amd64}"
+export JAVA_HOME="${JAVA_HOME:-$HOME/opt/jdk-17.0.20.1+1}"
 export HADOOP_HOME="${HADOOP_HOME:-$HOME/opt/hadoop}"
 export HADOOP_CONF_DIR="$HADOOP_HOME/etc/hadoop"
 export PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH"
 export ML_STREAMING_JAR="$HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-3.4.1.jar"
 
 REPO="${REPO:-$HOME/movielens-data-agent}"
-export ML_DATA_DIR="${ML_DATA_DIR:-$HOME/data/ml-1m-v2}"
+export ML_DATA_DIR="${ML_DATA_DIR:-$REPO/data/ml-1m-v2}"
 export ML_WORK_DIR="${ML_WORK_DIR:-$HOME/mlqc-test/work}"
 export ML_OUT_DIR="${ML_OUT_DIR:-$HOME/mlqc-test/out}"
 

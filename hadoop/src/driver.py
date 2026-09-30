@@ -1237,8 +1237,8 @@ def main():
     ap.add_argument('--task-id', default=None, help='任务标识，默认按时间生成')
     ap.add_argument('--data-dir',
                     default=os.environ.get('ML_DATA_DIR',
-                                           os.path.expanduser('~/data/ml-1m-v2')),
-                    help='原始数据目录（默认 ~/data/ml-1m-v2，即课程给定的 v2 数据；'
+                                           os.path.join(REPO_DIR, 'data', 'ml-1m-v2')),
+                    help='原始数据目录（默认仓库内 data/ml-1m-v2，即课程给定的 v2 数据；'
                          'v1 为 GroupLens 官方未改动版本，已停用）')
     ap.add_argument('--work-dir', default='/tmp/mlqc-driver')
     ap.add_argument('--out', default=None, help='输出 JSON 路径（默认写入 reports/quality-report/）')

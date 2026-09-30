@@ -49,20 +49,18 @@ v2 = 官方 v1 全量记录 + 注入记录，注入内容按表统计如下（�
 ```bash
 # 在 WSL Ubuntu-22.04 中执行（Windows 侧路径通过 /mnt/c 访问）
 
-# 1) 官方 v1（如需保留作基准）
-mkdir -p ~/data/ml-1m-v1
+# 数据统一放在仓库内 data/ml-1m-v2/（已在 .gitignore 中排除，不上传）
 
-# 2) 课程给定的 v2
-mkdir -p ~/data/ml-1m-v2
-cp /mnt/c/Users/HP/OneDrive/Desktop/LLM/ml-1m/ml-1m/{ratings,movies,users}.dat ~/data/ml-1m-v2/
+# 1) 课程给定的 v2：一键解压到 data/ml-1m-v2/ 并自动核对校验和
+bash scripts_setup/install_data.sh
 
-# 3) 核对校验和（应与上表一致）
-sha256sum ~/data/ml-1m-v2/*.dat
+# 2) 核对校验和（应与上表一致）
+sha256sum data/ml-1m-v2/*.dat
 
-# 4) 跑完整流程（清洗前评分 → 清洗 → 清洗后评分）
-cd /mnt/c/Users/HP/OneDrive/Desktop/DaShuJu/lab2/movielens-data-agent
+# 3) 跑完整流程（清洗前评分 → 清洗 → 清洗后评分）
+cd ~/movielens-data-agent
 python3 hadoop/src/driver.py --mode hadoop --stage all \
-  --task-id task_002 --data-dir ~/data/ml-1m-v2
+  --task-id task_002 --data-dir data/ml-1m-v2
 ```
 
 ## 注意
