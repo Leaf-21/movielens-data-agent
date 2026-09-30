@@ -92,8 +92,9 @@ movielens-data-agent/
 # ① 成员A：Hadoop 服务层（8080）
 python3 hadoop/src/server.py --mode local --port 8080 --data-dir data/ml-1m-v2
 #    local=评估用本机模拟、清洗仍提交 Hadoop Streaming 作业（需 JAVA_HOME/HADOOP_HOME）；
-#    纯演示评估任务时无需 Hadoop。--mode hadoop 目前在部分 WSL 环境评估作业
-#    reduce 段异常（reducer 子进程 code 139），排查中，演示统一用 local。
+#    纯演示评估任务时无需 Hadoop。--mode hadoop 已在 WSL 端到端验证可用
+#    （原 reduce 段 code 139 异常系 JAVA_HOME 指向不存在路径所致，已修复；
+#    一键脚本 start_all_wsl.sh 即以 hadoop 模式运行）。
 # ② 成员B：Agent API（8090）
 python3 agent/src/api.py --port 8090 --hadoop-url http://127.0.0.1:8080
 # ③ 成员C：前端静态服务 + 反向代理（8000）

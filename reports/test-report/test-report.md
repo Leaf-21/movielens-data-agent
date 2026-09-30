@@ -43,13 +43,13 @@ Hadoop 实际结果  →  Agent 返回结果  →  前端展示结果
 
 ```bash
 # 全部测试
-python tests/run_all.py --report reports/test-report/test-report.md
+python3 tests/run_all.py --report reports/test-report/test-report.md
 
 # 仅前端渲染（Node）
 node tests/frontend/test_render.mjs
 
 # 仅三层一致性（Python）
-python tests/frontend/test_e2e_consistency.py
+python3 tests/frontend/test_e2e_consistency.py
 ```
 
 
