@@ -720,7 +720,7 @@ Before 与 After 两次评分**必须调用同一份评分程序、同一套阈�
 
 ## 8. 附：可复现的验证命令
 
-以下命令用于在本地快速复核本文档的关键结论。清洗前数据在 `~/data/ml-1m-v2`（校验和见 `data/DATASETS.md`），清洗后数据在 `hadoop/output/clean/`。
+以下命令用于在本地快速复核本文档的关键结论。清洗前数据在仓库内 `data/ml-1m-v2`（校验和见 `data/DATASETS.md`），清洗后数据在 `hadoop/output/clean/`。
 
 ```bash
 # ===== 2. 规模与时间边界 =====

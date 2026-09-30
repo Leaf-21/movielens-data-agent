@@ -320,12 +320,12 @@ cd movielens-data-agent
 
 # 完整流程：清洗前评分(12 作业) -> 清洗(3 作业) -> 清洗后评分(12 作业) -> 组装结果
 python3 hadoop/src/driver.py --mode hadoop --stage all \
-  --task-id task_002 --data-dir ~/data/ml-1m-v2
+  --task-id task_002 --data-dir data/ml-1m-v2
 
 # 也可分阶段执行（对应接口规范第 9-11 节）
-python3 hadoop/src/driver.py --mode hadoop --stage before --task-id task_002 --data-dir ~/data/ml-1m-v2
-python3 hadoop/src/driver.py --mode hadoop --stage clean  --task-id task_002 --data-dir ~/data/ml-1m-v2
-python3 hadoop/src/driver.py --mode hadoop --stage after  --task-id task_002 --data-dir ~/data/ml-1m-v2
+python3 hadoop/src/driver.py --mode hadoop --stage before --task-id task_002 --data-dir data/ml-1m-v2
+python3 hadoop/src/driver.py --mode hadoop --stage clean  --task-id task_002 --data-dir data/ml-1m-v2
+python3 hadoop/src/driver.py --mode hadoop --stage after  --task-id task_002 --data-dir data/ml-1m-v2
 python3 hadoop/src/driver.py --mode hadoop --stage result --task-id task_002   # 不重跑作业，仅组装结果
 ```
 

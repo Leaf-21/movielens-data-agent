@@ -284,12 +284,12 @@
 
 ```bash
 # 规模核对（清洗前）
-wc -l < ~/data/ml-1m-v2/ratings.dat   # 期望 1150241
-wc -l < ~/data/ml-1m-v2/movies.dat    # 期望 4465
-wc -l < ~/data/ml-1m-v2/users.dat     # 期望 6946
+wc -l < data/ml-1m-v2/ratings.dat   # 期望 1150241
+wc -l < data/ml-1m-v2/movies.dat    # 期望 4465
+wc -l < data/ml-1m-v2/users.dat     # 期望 6946
 
 # 编码核对（必须用 awk，不能用 grep —— grep 会把 ISO-8859-1 文件当二进制并丢行）
-awk -F'::' '{print $2}' ~/data/ml-1m-v2/movies.dat | grep -c '[^ -~]'   # 含特殊字符标题行数
+awk -F'::' '{print $2}' data/ml-1m-v2/movies.dat | grep -c '[^ -~]'   # 含特殊字符标题行数
 
 # 清洗后规模
 wc -l hadoop/output/clean/*.dat hadoop/output/isolated/*.dat
@@ -298,5 +298,5 @@ wc -l hadoop/output/clean/*.dat hadoop/output/isolated/*.dat
 head -20 hadoop/output/audit/ratings.tsv
 
 # 完整流程复现
-python3 hadoop/src/driver.py --mode hadoop --stage all --task-id task_002 --data-dir ~/data/ml-1m-v2
+python3 hadoop/src/driver.py --mode hadoop --stage all --task-id task_002 --data-dir data/ml-1m-v2
 ```

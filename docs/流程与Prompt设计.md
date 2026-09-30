@@ -113,7 +113,7 @@ report.limitations；失败任务→环节+原因+指引+部分结果。
 
 ```bash
 # 终端1：成员A服务（本地联调用 local 模式）
-python3 hadoop/src/server.py --mode local --data-dir ~/data/ml-1m
+python3 hadoop/src/server.py --mode local --data-dir data/ml-1m-v2
 
 # 终端2：成员B Agent
 python3 agent/src/api.py --port 8090   # ML_HADOOP_URL 可覆盖A服务地址
