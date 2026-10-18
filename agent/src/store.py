@@ -106,9 +106,11 @@ class TaskStore(object):
     # CRUD
     # ------------------------------------------------------------------
 
-    def create(self, task_id, prompt, plan, message='任务已创建，等待调度'):
+    def create(self, task_id, prompt, plan, message='任务已创建，等待调度',
+               task_type='cleaning'):
         rec = {
             'task_id': task_id,
+            'task_type': task_type,
             'status': PENDING,
             'stage': None,
             'message': message,
@@ -182,7 +184,7 @@ class TaskStore(object):
             for rec in sorted(self._tasks.values(),
                               key=lambda r: r['created_at']):
                 out.append({k: rec.get(k) for k in
-                            ('task_id', 'status', 'stage', 'message',
+                            ('task_id', 'task_type', 'status', 'stage', 'message',
                              'created_at', 'updated_at')})
             return out
 

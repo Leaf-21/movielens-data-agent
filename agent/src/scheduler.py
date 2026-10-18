@@ -41,6 +41,7 @@ from errors import AgentError        # noqa: E402
 from hadoop_tool import HadoopToolError  # noqa: E402
 import result_builder                # noqa: E402
 import explainer                     # noqa: E402
+import analysis_runner               # noqa: E402
 
 
 class PipelineScheduler(threading.Thread):
@@ -73,11 +74,24 @@ class PipelineScheduler(threading.Thread):
             if task_id is None:
                 break
             try:
-                self._execute(task_id)
+                if self._task_type(task_id) == 'cleaning':
+                    self._execute(task_id)
+                else:
+                    # 迭代二分析任务（clustering/classification/...）：
+                    # 同一条 FIFO 队列、同一套状态机，仅执行体不同。
+                    analysis_runner.run_task(self.store, task_id,
+                                             self.results_dir)
             except Exception:  # 调度器自身绝不允许因单任务异常而退出
                 traceback.print_exc()
             finally:
                 self.q.task_done()
+
+    def _task_type(self, task_id):
+        rec = self.store.get(task_id)
+        if rec is None:
+            return 'cleaning'
+        return rec.get('task_type') or rec.get('plan', {}).get('task_type',
+                                                               'cleaning')
 
     # ------------------------------------------------------------------
 
