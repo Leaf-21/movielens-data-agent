@@ -96,10 +96,8 @@ PR 描述至少包含：算法名和 PPT 页码、画像版本、聚类参数、
 
 | 项目 | 记录 |
 |---|---|
-| 聚类算法一 | 待从课程 PPT 确认 |
-| PPT 章节/页码 | 待填写 |
-| 聚类算法二 | 待从课程 PPT 确认 |
-| PPT 章节/页码 | 待填写 |
-| 画像特征版本 | 待填写 |
-| 群体解释方法 | 待填写，必须由真实统计支撑 |
-| 最终聚类结果版本 | 运行后填写 |
+| 聚类算法一 | K-Means（kmeans++ 初始化 + Lloyd 迭代，固定种子 42 保证可复现；工具 `clustering_kmeans`）。课程 PPT 章节/页码：待团队核对后登记（不凭惯例声称） |
+| 聚类算法二 | DBSCAN（密度聚类，支持噪声标记；eps 默认取第 15 近邻 k-距离 P90；工具 `clustering_dbscan`）。课程 PPT 章节/页码：待团队核对后登记 |
+| 画像特征版本 | `profile-v1`：训练期（Timestamp≤T1=2000-11-22）27 维=9 行为统计+18 类型占比，z-score 仅用 OK 用户拟合；OK 4783 / 历史不足 74 / 无训练记录 1168；孤儿引用 13 人如实登记；工件 `agent/artifacts/profiles/profile-v1.jsonl`（sha256 `b5665c17…`，全文见 `agent/config/versions.json`） |
+| 群体解释方法 | 群成员真实统计（人数、平均评分、高分占比、活跃跨度、类型占比 Top3）+ 代表性内容=群成员训练期 Rating≥4 计数前列电影（≥3 人群内高分、取前 5）；口径写入 `cluster_summaries[*].summary_basis`，无凭模型名生成的描述 |
+| 最终聚类结果版本 | 全量真实运行（`python3 -I agent/tools/clustering/run_fit.py`）：`clustering_kmeans` 模型 `mdl-a18e5c6560` / 结果 `res-4492caf82d7e`（k=6，全量轮廓系数 0.1199，DBI 1.935，SSE 94764.7）；`clustering_dbscan` 模型 `mdl-168b6fb696` / 结果 `res-da0406825eda`（eps=4.3278，1 密度巨簇+223 噪声，轮廓/DBI 如实 null）。实验记录：`reports/analysis/clustering-profile-v1-2026-10-18.md`；工件：`agent/artifacts/clustering/` |
