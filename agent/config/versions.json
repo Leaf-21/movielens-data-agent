@@ -30,7 +30,7 @@
     "rule-v2": {
       "desc": "迭代一清洗与评分规则（五维定义、阈值、权重、T1/T2；新增解析容错、时间戳单位、标识符取值域、Genres 域校验与主键冲突处置）",
       "defined_in": "hadoop/config/rules.json",
-      "method_doc": "docs/evaluation-method.md"
+      "method_doc": "docs/迭代一/交付文档/evaluation-method.md"
     }
   }
 }

@@ -4,7 +4,7 @@
 跨表引用完整性检查（C1 / C2）—— Mapper
 
 用途：检查 ratings 引用的 UserID / MovieID 是否存在于对应的 users / movies 表中。
-      （docs/evaluation-method.md 第 4.5 节 C1、C2）
+      （docs/迭代一/交付文档/evaluation-method.md 第 4.5 节 C1、C2）
 
 实现方式：Reduce-side Join
   - 两份输入都读进同一个 job，mapper 按输入文件名区分来源。

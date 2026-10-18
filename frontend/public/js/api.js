@@ -3,7 +3,7 @@
  * 职责：只调用成员B提供的 Agent API（接口规范第 18 节）。
  *   前端不直接访问 Hadoop 内部实现（接口规范第 2.1 节）。
  *
- * 契约依据：docs/接口规范文档.md
+ * 契约依据：docs/迭代一/分工/接口规范文档.md
  *   第 4 节   POST /api/tasks                 创建任务
  *   第 6 节   GET  /api/tasks/{task_id}       查询状态
  *   第 13 节  GET  /api/tasks/{task_id}/result 最终评估结果

@@ -10,7 +10,7 @@
 
 表类型由环境变量 ML_TABLE 指定：ratings | movies | users
 
-对应指标编号见 docs/evaluation-method.md 第 4 节：
+对应指标编号见 docs/迭代一/交付文档/evaluation-method.md 第 4 节：
   A1-A4  ratings 字段合法性
   A5-A8  users 字段合法性
   A9-A10 movies 标题合法性
@@ -32,7 +32,7 @@ import ml_common as ml
 # 标题结尾的年份形如 "(1995)"，允许其后有空白
 TITLE_YEAR_RE = re.compile(r'\((\d{4})\)\s*$')
 
-# 判据来自 docs/evaluation-method.md 的 A10：年份须落在 1900-2003
+# 判据来自 docs/迭代一/交付文档/evaluation-method.md 的 A10：年份须落在 1900-2003
 YEAR_MIN, YEAR_MAX = 1900, 2003
 
 

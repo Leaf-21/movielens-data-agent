@@ -6,10 +6,10 @@ MovieLens 数据治理 Driver
 职责：
   1. 依次运行检查作业（格式检查 / 跨表引用 / 唯一性 / 一致性）
   2. 汇总各作业输出的计数指标
-  3. 按 docs/evaluation-method.md 的公式计算五维得分
-  4. 输出符合 docs/接口规范文档.md 契约的 JSON
+  3. 按 docs/迭代一/交付文档/evaluation-method.md 的公式计算五维得分
+  4. 输出符合 docs/迭代一/分工/接口规范文档.md 契约的 JSON
 
-三个阶段（对应 docs/接口规范文档.md 第 9、10、11 节的三个接口）
+三个阶段（对应 docs/迭代一/分工/接口规范文档.md 第 9、10、11 节的三个接口）
   before  清洗前质量评分
   clean   数据清洗
   after   清洗后质量评分
@@ -28,8 +28,8 @@ MovieLens 数据治理 Driver
 ⚠️ 关于"真实结果"的要求：
   本程序不使用任何占位数据。所有数值均来自实际扫描数据文件的统计。
   某个阶段尚未实现或执行失败时，程序**明确报错退出**，绝不返回占位结果。
-  依据：docs/接口规范文档.md 第 2.2 节、第 15 节
-        docs/迭代一_Hadoop数据清洗与Agent基础.md 第 80 行
+  依据：docs/迭代一/分工/接口规范文档.md 第 2.2 节、第 15 节
+        docs/迭代一/迭代一_Hadoop数据清洗与Agent基础.md 第 80 行
 """
 
 import argparse
@@ -437,7 +437,7 @@ def score_up_to_date(m):
     """
     时效性 = 第一层（时间可解释性）× 第二层（时间新鲜度）
 
-    依据 docs/evaluation-method.md 第 4.4 节：
+    依据 docs/迭代一/交付文档/evaluation-method.md 第 4.4 节：
 
       第一层 reliability：时间戳能否被合理解释
           = 合规记录数 / 总记录数
@@ -464,7 +464,7 @@ def score_up_to_date(m):
     **这不是 bug，与数据质量也无关**：T1/T2 一旦按分位数确定，该均值
     就基本被锁定。它衡量的是"数据在时间窗口内的新近程度"，而本数据集
     90.5% 的评分集中在 2000 年，新近程度本来就低。
-    依据 docs/迭代一_Hadoop数据清洗与Agent基础.md 第 51 行：
+    依据 docs/迭代一/迭代一_Hadoop数据清洗与Agent基础.md 第 51 行：
     "数据年代较早并不必然属于错误"。
 
     ⚠️ 清洗前该维度得分反而更高（29.5905），原因不是数据更好，而是脏数据里
@@ -565,7 +565,7 @@ def build_result(task_id, metrics, scores, details, after_metrics=None,
     """
     组装最终评估结果 JSON。
 
-    契约依据：docs/接口规范文档.md 第 13 节（GET /api/tasks/{task_id}/result）
+    契约依据：docs/迭代一/分工/接口规范文档.md 第 13 节（GET /api/tasks/{task_id}/result）
     本次新增字段：score_change、problems、unresolved_problems、report
     以及版本命名 input_version / output_version（第 16 节）。
 
@@ -1226,7 +1226,7 @@ def stage_all(args, task_id):
 
 def main():
     ap = argparse.ArgumentParser(
-        description='MovieLens 数据治理 driver（对应 docs/接口规范文档.md 第 9-11 节）')
+        description='MovieLens 数据治理 driver（对应 docs/迭代一/分工/接口规范文档.md 第 9-11 节）')
     ap.add_argument('--stage', choices=['all', 'before', 'clean', 'after', 'result'],
                     default='all',
                     help='执行阶段：before=清洗前评分；clean=数据清洗；'

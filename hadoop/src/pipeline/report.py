@@ -5,7 +5,7 @@
 
 职责：构建接口规范要求的 report 对象。
 
-对应接口规范：docs/接口规范文档.md 第 14 节
+对应接口规范：docs/迭代一/分工/接口规范文档.md 第 14 节
 
     "report": {
       "method": "五维质量评分方法说明",
@@ -22,7 +22,7 @@
 
 设计说明
 --------
-method 与 limitations 的内容来自 docs/evaluation-method.md，
+method 与 limitations 的内容来自 docs/迭代一/交付文档/evaluation-method.md，
 这里以结构化形式内嵌到 JSON 中，使 Agent 无需读取 Markdown 文件
 即可生成用户可见的解释（接口规范第 2.1 节要求 Hadoop 不做自然语言解释，
 但需要提供可供解释的"证据"）。
@@ -72,7 +72,7 @@ def build_method(scores, weights, cfg):
         'same_criteria': '清洗前后使用同一份评分程序、同一套阈值与权重，仅输入数据集不同，'
                          '以保证结果可比较。',
         'rule_version': cfg.get('rule_version'),
-        'evaluation_doc': 'docs/evaluation-method.md',
+        'evaluation_doc': 'docs/迭代一/交付文档/evaluation-method.md',
     }
 
 
@@ -86,7 +86,7 @@ def build_improvements(before_scores, after_scores):
 
     只在 After 评分存在时生成。每个元素说明某一维度的变化量。
     注意：变化量可能为 0 或为负，**如实报告**，不做美化。
-    依据 docs/迭代一_Hadoop数据清洗与Agent基础.md 第 69 行：
+    依据 docs/迭代一/迭代一_Hadoop数据清洗与Agent基础.md 第 69 行：
     "不要求所有维度的分数都提高，也不预设必须达到的分数"。
     """
     if not after_scores or before_scores is None:
@@ -166,7 +166,7 @@ def build_unresolved(unresolved_problems):
     """
     构建 unresolved 字段。
 
-    依据 docs/迭代一_Hadoop数据清洗与Agent基础.md 第 91 行：
+    依据 docs/迭代一/迭代一_Hadoop数据清洗与Agent基础.md 第 91 行：
     避免将删除或隔离记录直接表述为"问题已修复"。
     因此这里逐条说明问题的**真实性质**，而不统一写成"已解决"。
     """
@@ -195,7 +195,7 @@ def build_unresolved(unresolved_problems):
 # ---------------------------------------------------------------------------
 # limitations：无法验证的情况
 # ---------------------------------------------------------------------------
-# 依据 docs/接口规范文档.md 第 14 节与 docs/evaluation-method.md 第 6.2 节。
+# 依据 docs/迭代一/分工/接口规范文档.md 第 14 节与 docs/迭代一/交付文档/evaluation-method.md 第 6.2 节。
 # 内容为固定说明，不随数据变化。
 # ---------------------------------------------------------------------------
 LIMITATIONS = [

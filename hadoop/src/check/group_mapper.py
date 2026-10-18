@@ -3,7 +3,7 @@
 """
 分组类检查 —— Mapper（通用，覆盖 6 个场景）
 
-支持两类检查（依据 docs/evaluation-method.md 第 4.3、4.5 节）：
+支持两类检查（依据 docs/迭代一/交付文档/evaluation-method.md 第 4.3、4.5 节）：
 
   [multi] 同一主键是否对应多个不同属性值  -> C4 / C5 / C6
   [uniq]  主键是否重复                    -> U1 / U2 / U3

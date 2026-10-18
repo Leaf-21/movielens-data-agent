@@ -3,7 +3,7 @@
 """
 Agent API 服务（成员B负责的三条接口 + 追问扩展）
 
-契约依据：docs/接口规范文档.md
+契约依据：docs/迭代一/分工/接口规范文档.md
   第 4/5 节   POST /api/tasks                 创建任务（异步）
   第 6 节     GET  /api/tasks/{task_id}       查询状态
   第 13 节    GET  /api/tasks/{task_id}/result 最终评估结果
@@ -332,7 +332,7 @@ def serve(host, port, hadoop_url):
 
 def main():
     ap = argparse.ArgumentParser(
-        description='Agent API 服务（对应 docs/接口规范文档.md 第 4/6/13/18 节）')
+        description='Agent API 服务（对应 docs/迭代一/分工/接口规范文档.md 第 4/6/13/18 节）')
     ap.add_argument('--host', default=config.AGENT_HOST)
     ap.add_argument('--port', type=int, default=config.AGENT_PORT)
     ap.add_argument('--hadoop-url',

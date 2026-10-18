@@ -5,7 +5,7 @@ Hadoop 服务层（HTTP）
 
 职责：把 driver 的三个阶段暴露为 HTTP 接口。
 
-契约依据：docs/接口规范文档.md
+契约依据：docs/迭代一/分工/接口规范文档.md
   第 2.3 节  统一使用 JSON / UTF-8 / REST API / HTTP
   第 9 节    POST /hadoop/quality-score/before
   第 10 节   POST /hadoop/clean
@@ -280,7 +280,7 @@ def serve(host, port, mode, data_dir, work_dir):
 
 def main():
     ap = argparse.ArgumentParser(
-        description='Hadoop 服务层（对应 docs/接口规范文档.md 第 9-11 节）')
+        description='Hadoop 服务层（对应 docs/迭代一/分工/接口规范文档.md 第 9-11 节）')
     ap.add_argument('--host', default='127.0.0.1', help='监听地址，默认 127.0.0.1')
     ap.add_argument('--port', type=int, default=8080, help='监听端口，默认 8080')
     ap.add_argument('--mode', choices=['local', 'hadoop'], default='hadoop',

@@ -2,8 +2,8 @@
 
 本文档是迭代一分工文档中成员B"Prompt / 流程设计"交付物，
 描述 `agent/` 模块的完整执行流程、状态机、需求解析规则与 Prompt 设计。
-契约字段以 `docs/接口规范文档.md` 为准，评分口径以
-`hadoop/config/rules.json` 与 `docs/evaluation-method.md` 为准。
+契约字段以 `docs/迭代一/分工/接口规范文档.md` 为准，评分口径以
+`hadoop/config/rules.json` 与 `docs/迭代一/交付文档/evaluation-method.md` 为准。
 
 ## 1. 总体流程
 

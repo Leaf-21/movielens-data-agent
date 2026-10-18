@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Hadoop Tool 封装接口（对应 docs/接口规范文档.md 第 8 节）
+Hadoop Tool 封装接口（对应 docs/迭代一/分工/接口规范文档.md 第 8 节）
 
 Agent 不直接触碰 Hadoop 作业细节；本模块把成员A提供的三个 HTTP 端点
 （接口规范第 9-11 节）封装为三个工具函数：

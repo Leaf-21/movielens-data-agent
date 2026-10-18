@@ -350,7 +350,7 @@ def is_digits(b, allow_leading_zero=True):
 
 def is_positive_int_str(b):
     """
-    是否为正整数字符串（按 docs/evaluation-method.md 的 A1/A2 判据）。
+    是否为正整数字符串（按 docs/迭代一/交付文档/evaluation-method.md 的 A1/A2 判据）。
     判据为 ^[1-9][0-9]*$，注意首字符不能是 '0'，因此 '0' 本身不合法。
     """
     if not b:
