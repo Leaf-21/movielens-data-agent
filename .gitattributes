@@ -34,6 +34,15 @@ Makefile       text eol=lf
 
 # --- 文档：保持 CRLF，与仓库中已有文档一致 ---
 *.md text eol=crlf
+# 迭代二实验记录例外用 LF：工件 sha256 登记按提交字节核验，
+# 跨平台检出不得改变内容
+reports/analysis/*.md text eol=lf
+
+# --- 迭代二数据工件：禁止任何换行符转换 ---
+# profile-v1.jsonl 等 sha256 已登记进 agent/config/versions.json，
+# Windows 检出若转 CRLF 会让核验值对不上（迭代三直接复用）
+*.jsonl           -text
+agent/artifacts/** -text
 
 # --- 二进制文件：禁止任何换行符转换 ---
 *.dat  binary
