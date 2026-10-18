@@ -1,0 +1,45 @@
+{
+  "artifact": "clusters-dbscan-v1",
+  "artifact_kind": "analysis_result_envelope",
+  "generated_at": "2026-10-18T10:51:47Z",
+  "generated_by": "agent/tools/clustering/run_fit.py",
+  "code_version": "b920f1d",
+  "data_version": "movielens-1m-v2-clean-v1",
+  "profile_version": "profile-v1",
+  "analysis_version": "iter2-analysis-v1",
+  "model_version": "mdl-168b6fb696",
+  "result_version": "res-da0406825eda",
+  "algorithm_tool": "clustering_dbscan",
+  "tool_module": "agent/tools/clustering/dbscan_tool.py",
+  "algorithm_source": "经典密度聚类（支持噪声标记）；课程 PPT 章节/页码待团队核对后登记",
+  "n_targets": 6025,
+  "metrics_brief": {
+    "n_clusters": 1,
+    "eps_used": 4.327840793542366,
+    "eps_method": "kdistance_p90",
+    "noise_count": 223,
+    "noise_ratio": 0.046623458080702486,
+    "silhouette_full": null,
+    "n_fit_users": 4783
+  },
+  "elapsed_ms": 17828,
+  "json_sha256": "7d5e1aee5c6e319cfbfd9789fa3fd9ab95ea2f0d8bf2ee134e59c053802096a3",
+  "eps_probe_metrics": [
+    {
+      "label": "P50",
+      "eps": 2.860000224752708,
+      "n_clusters": 1,
+      "noise_count": 1282,
+      "noise_ratio": 0.2680326155132762,
+      "silhouette_full": null
+    },
+    {
+      "label": "P75",
+      "eps": 3.4828928120589695,
+      "n_clusters": 1,
+      "noise_count": 552,
+      "noise_ratio": 0.11540873928496759,
+      "silhouette_full": null
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+{
+  "profile_version": "profile-v1",
+  "data_version": "movielens-1m-v2-clean-v1",
+  "clean_dir": "hadoop/output/clean",
+  "input_sha256": {
+    "ratings.dat": "82be75a4cf84249e2f4747cc720078c410730e2461b916fdf1c1380667bfa0fd",
+    "movies.dat": "7ffe7c6a59340a131b42b2aabaf057bdf6078dec4950b070d549129486d91daa",
+    "users.dat": "9497271cb958f70ceacf7d32dee1f0a019457aaa2484302e6d2083ad50c14b23"
+  },
+  "input_total_rows": {
+    "ratings_all": 996113
+  },
+  "T1": "2000-11-22",
+  "T2": "2000-12-10",
+  "T1_epoch": 974862386,
+  "T2_epoch": 976422054,
+  "min_train_ratings": 10,
+  "feature_names": [
+    "n_ratings",
+    "avg_rating",
+    "std_rating",
+    "rating_bias",
+    "high_share",
+    "avg_movie_pop",
+    "share_top_pop",
+    "active_span_days",
+    "avg_gap_days",
+    "genre_share_action",
+    "genre_share_adventure",
+    "genre_share_animation",
+    "genre_share_childrens",
+    "genre_share_comedy",
+    "genre_share_crime",
+    "genre_share_documentary",
+    "genre_share_drama",
+    "genre_share_fantasy",
+    "genre_share_film-noir",
+    "genre_share_horror",
+    "genre_share_musical",
+    "genre_share_mystery",
+    "genre_share_romance",
+    "genre_share_sci-fi",
+    "genre_share_thriller",
+    "genre_share_war",
+    "genre_share_western"
+  ],
+  "feature_dict": {
+    "n_ratings": {
+      "cn": "训练期评分数",
+      "formula": "count(Timestamp<=T1)",
+      "missing": "0",
+      "window": "train"
+    },
+    "avg_rating": {
+      "cn": "平均评分",
+      "formula": "mean(Rating)",
+      "missing": "仅对有评分用户计算",
+      "window": "train"
+    },
+    "std_rating": {
+      "cn": "评分标准差",
+      "formula": "pstd(Rating)，n<2 记 0",
+      "missing": "0",
+      "window": "train"
+    },
+    "rating_bias": {
+      "cn": "相对全局的评分偏移",
+      "formula": "avg_rating - 训练期全局平均分",
+      "missing": "0",
+      "window": "train"
+    },
+    "high_share": {
+      "cn": "高分占比",
+      "formula": "count(Rating>=4)/n_ratings",
+      "missing": "0",
+      "window": "train"
+    },
+    "avg_movie_pop": {
+      "cn": "所看电影平均热度(log1p)",
+      "formula": "mean(log1p(该电影训练期评分数))",
+      "missing": "0",
+      "window": "train"
+    },
+    "share_top_pop": {
+      "cn": "头部热度电影占比",
+      "formula": "所看电影中训练期热度前四分位的占比",
+      "missing": "0",
+      "window": "train"
+    },
+    "active_span_days": {
+      "cn": "活跃跨度天数",
+      "formula": "(max_ts-min_ts)/86400，单条记 0",
+      "missing": "0",
+      "window": "train"
+    },
+    "avg_gap_days": {
+      "cn": "平均评分间隔天数",
+      "formula": "span/(n-1)，单条记 0",
+      "missing": "0",
+      "window": "train"
+    },
+    "genre_share_<G>": {
+      "cn": "18 个类型的评分占比（逐列）",
+      "formula": "count(含类型G的已评分电影)/n_unique_movies",
+      "missing": "0",
+      "window": "train",
+      "source": "hadoop/config/rules.json genres.valid（与清洗校验同一词表）"
+    },
+    "_excluded": "users.dat 的性别/年龄/职业/邮编未纳入 v1 聚类特征：迭代一评价局限已确认属性真实性无法核验，且为注册期静态信息；记录于 limitations。"
+  },
+  "scaler": {
+    "type": "zscore_fit_on_ok_users",
+    "mean": {
+      "n_ratings": 145.84674890236252,
+      "avg_rating": 3.7099306037812902,
+      "std_rating": 1.000686163699277,
+      "rating_bias": 0.10804928725963923,
+      "high_share": 0.6251069282199175,
+      "avg_movie_pop": 6.151504732098198,
+      "share_top_pop": 0.7701452714179237,
+      "active_span_days": 10.136547063868177,
+      "avg_gap_days": 0.08543469493993068,
+      "genre_share_action": 0.26440574164339076,
+      "genre_share_adventure": 0.13644140385372305,
+      "genre_share_animation": 0.044556236162547086,
+      "genre_share_childrens": 0.06856057117413387,
+      "genre_share_comedy": 0.3473047924912427,
+      "genre_share_crime": 0.08145545713214683,
+      "genre_share_documentary": 0.007854349702290205,
+      "genre_share_drama": 0.3671010195744505,
+      "genre_share_fantasy": 0.036825703019544985,
+      "genre_share_film-noir": 0.023095944202226753,
+      "genre_share_horror": 0.07249860434454888,
+      "genre_share_musical": 0.039191365978586155,
+      "genre_share_mystery": 0.04145875399113728,
+      "genre_share_romance": 0.14553369038481287,
+      "genre_share_sci-fi": 0.17023536359792837,
+      "genre_share_thriller": 0.19626177221016272,
+      "genre_share_war": 0.0799002200227244,
+      "genre_share_western": 0.019782745366470594
+    },
+    "std": {
+      "n_ratings": 165.48435909836942,
+      "avg_rating": 0.42935279183087355,
+      "std_rating": 0.20181164356314915,
+      "rating_bias": 0.42935279183087344,
+      "high_share": 0.16661553217364994,
+      "avg_movie_pop": 0.361986098531042,
+      "share_top_pop": 0.12546253643036576,
+      "active_span_days": 28.261913290151575,
+      "avg_gap_days": 0.36149864645924845,
+      "genre_share_action": 0.1812256229411213,
+      "genre_share_adventure": 0.1047264835282314,
+      "genre_share_animation": 0.06357682988655743,
+      "genre_share_childrens": 0.08397769883761237,
+      "genre_share_comedy": 0.17467209397864428,
+      "genre_share_crime": 0.06748274249160685,
+      "genre_share_documentary": 0.025204424904329142,
+      "genre_share_drama": 0.16444545662723456,
+      "genre_share_fantasy": 0.04902491699260416,
+      "genre_share_film-noir": 0.04590673690176463,
+      "genre_share_horror": 0.10342548822436058,
+      "genre_share_musical": 0.05796984597500496,
+      "genre_share_mystery": 0.05142203988065421,
+      "genre_share_romance": 0.10627382938141866,
+      "genre_share_sci-fi": 0.15715378699791302,
+      "genre_share_thriller": 0.11244854552768496,
+      "genre_share_war": 0.06698160567350406,
+      "genre_share_western": 0.035654279351164726
+    },
+    "zero_std_columns_kept_zero": []
+  },
+  "n_users_total": 6025,
+  "n_profile_ok": 4783,
+  "n_insufficient_history": 74,
+  "n_no_train_history": 1168,
+  "n_train_users_not_in_users_dat": 13,
+  "orphan_user_ids": [
+    1259,
+    1434,
+    2106,
+    2853,
+    3355,
+    3905,
+    4454,
+    4538,
+    4913,
+    4973,
+    5100,
+    5510,
+    5904
+  ],
+  "n_train_ratings_used": 700148,
+  "global_train_mean_rating": 3.60188131652165,
+  "config_fingerprint": "[\"profile-v1\", 10, [\"n_ratings\", \"avg_rating\", \"std_rating\", \"rating_bias\", \"high_share\", \"avg_movie_pop\", \"share_top_pop\", \"active_span_days\", \"avg_gap_days\", \"genre_share_action\", \"genre_share_adventure\", \"genre_share_animation\", \"genre_share_childrens\", \"genre_share_comedy\", \"genre_share_crime\", \"genre_share_documentary\", \"genre_share_drama\", \"genre_share_fantasy\", \"genre_share_film-noir\", \"genre_share_horror\", \"genre_share_musical\", \"genre_share_mystery\", \"genre_share_romance\", \"genre_share_sci-fi\", \"genre_share_thriller\", \"genre_share_war\", \"genre_share_western\"], 974862386]",
+  "code_version": "b920f1d",
+  "created_at": "2026-10-18T10:19:41Z",
+  "window_note": "特征只用 Timestamp<=T1 训练期记录（数据与实验规范 §四.1）"
+}

@@ -1,0 +1,26 @@
+{
+  "artifact": "clusters-kmeans-v1",
+  "artifact_kind": "analysis_result_envelope",
+  "generated_at": "2026-10-18T10:51:47Z",
+  "generated_by": "agent/tools/clustering/run_fit.py",
+  "code_version": "b920f1d",
+  "data_version": "movielens-1m-v2-clean-v1",
+  "profile_version": "profile-v1",
+  "analysis_version": "iter2-analysis-v1",
+  "model_version": "mdl-a18e5c6560",
+  "result_version": "res-4492caf82d7e",
+  "algorithm_tool": "clustering_kmeans",
+  "tool_module": "agent/tools/clustering/kmeans_tool.py",
+  "algorithm_source": "经典划分聚类；课程 PPT 章节/页码待团队核对后登记（不得凭惯例声称）",
+  "n_targets": 6025,
+  "metrics_brief": {
+    "k_selected": 6,
+    "silhouette_full": 0.11986815299158346,
+    "davies_bouldin_full": 1.934505468620656,
+    "sse_full": 94764.74760230673,
+    "n_fit_users": 4783
+  },
+  "elapsed_ms": 18561,
+  "json_sha256": "a183196eac81bf48f281cae83a2548ec3679747a058354de9533a931c8e98240",
+  "eps_probe_metrics": null
+}
