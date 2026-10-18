@@ -26,8 +26,11 @@ CLEANING = 'CLEANING'
 AFTER_SCORE = 'AFTER_SCORE'
 GENERATE_REPORT = 'GENERATE_REPORT'
 COMPLETED = 'COMPLETED'
+# 迭代二分析任务专用阶段（接口扩展规范 §五 状态机；追加不删改，迭代一取值不动）
+PROFILE_BUILD = 'PROFILE_BUILD'
+CLUSTER_FIT = 'CLUSTER_FIT'
 STAGES = (PARSE_REQUEST, BEFORE_SCORE, CLEANING, AFTER_SCORE,
-          GENERATE_REPORT, COMPLETED)
+          GENERATE_REPORT, PROFILE_BUILD, CLUSTER_FIT, COMPLETED)
 
 # 阶段 -> 面向用户的进度说明（接口规范第 6 节示例的措辞）
 STAGE_MESSAGES = {
@@ -36,8 +39,13 @@ STAGE_MESSAGES = {
     CLEANING: '正在执行 Hadoop 数据清洗',
     AFTER_SCORE: '正在执行清洗后质量评分',
     GENERATE_REPORT: '正在汇总结果并生成评估报告',
+    PROFILE_BUILD: '正在构建/复用训练期用户画像',
+    CLUSTER_FIT: '正在执行聚类拟合与指标计算（可能需要数分钟）',
     COMPLETED: '任务执行完成',
 }
+
+# 任务类型（迭代二接口扩展规范 §2.2；缺省值 cleaning 向后兼容迭代一记录）
+TASK_TYPES = ('cleaning', 'classification', 'clustering', 'dimensionality_reduction')
 
 # ---------------------------------------------------------------------------
 # 五维字段（接口规范第 12 节）
