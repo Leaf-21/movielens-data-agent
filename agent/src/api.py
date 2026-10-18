@@ -36,24 +36,31 @@ _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 _TOOLS_DIR = os.path.join(os.path.dirname(_SRC_DIR), 'tools')
-if _TOOLS_DIR not in sys.path:
-    sys.path.insert(0, _TOOLS_DIR)
+for _p in (_TOOLS_DIR, os.path.join(_TOOLS_DIR, 'clustering')):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 import config                # noqa: E402
 import models                # noqa: E402
 import parser as req_parser  # noqa: E402
+import router as nl_router   # noqa: E402
+import registry              # noqa: E402
 import explainer             # noqa: E402
 from errors import (build_error_response, INVALID_REQUEST,  # noqa: E402
                     AGENT_EXECUTION_ERROR)
 from hadoop_tool import HadoopTool       # noqa: E402
 from store import TaskStore              # noqa: E402
 from scheduler import PipelineScheduler  # noqa: E402
+from common import AnalysisError         # noqa: E402
 
 # task_id 允许 1-64 个字母数字及 _ . -（与 hadoop_tool 白名单一致）
 _TASK_ID = r'[A-Za-z0-9_.\-]{1,64}'
 RE_TASK = re.compile(r'^/api/tasks/(%s)$' % _TASK_ID)
 RE_RESULT = re.compile(r'^/api/tasks/(%s)/result$' % _TASK_ID)
 RE_ASK = re.compile(r'^/api/tasks/(%s)/ask$' % _TASK_ID)
+# 迭代二接口扩展规范 §2.2：三类分析任务共用 GET 状态/结果接口
+RE_ANALYSIS = re.compile(r'^/api/analysis/(clustering|classification|'
+                         r'dimensionality-reduction)/tasks$')
 
 MAX_PROMPT_LEN = 2000
 
@@ -94,12 +101,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == '/api/tasks':
                 self._create_task()
+            elif RE_ANALYSIS.match(path):
+                self._create_analysis_task(RE_ANALYSIS.match(path).group(1))
             elif RE_ASK.match(path):
                 self._ask(RE_ASK.match(path).group(1))
             else:
                 self._fail(None, models.PARSE_REQUEST, INVALID_REQUEST,
                            '未知接口路径: POST %s' % path,
-                           '可用接口: POST /api/tasks, '
+                           '可用接口: POST /api/tasks, POST /api/analysis/'
+                           '{clustering|classification|dimensionality-reduction}/tasks, '
                            'POST /api/tasks/{task_id}/ask', status=404)
         except ValueError as e:  # JSON 解析类错误 -> 400 协议级
             self._fail(None, models.PARSE_REQUEST, INVALID_REQUEST, str(e),
@@ -108,6 +118,40 @@ class Handler(BaseHTTPRequestHandler):
             self._fail(None, models.PARSE_REQUEST, AGENT_EXECUTION_ERROR,
                        'Agent 服务内部错误: %s' % e,
                        traceback.format_exc()[-2000:])
+
+    def _create_analysis_task(self, url_category):
+        """
+        迭代二：POST /api/analysis/{类别}/tasks（接口扩展规范 §四）。
+        校验全部在建档前完成——业务失败返回 200 + FAILED（task_id 为 null），
+        不制造"必然失败的僵尸任务"；分类/降维在成员A/C工具合入并登记前
+        一律 MODEL_NOT_FOUND（registry 单一真源）。
+        """
+        req = self._read_body()
+        if not isinstance(req, dict):
+            raise ValueError('请求体必须是 JSON 对象')
+        try:
+            plan = nl_router.route(url_category, req)
+        except AnalysisError as e:
+            self._fail(None, models.PARSE_REQUEST, e.code, e.message,
+                       json.dumps(e.details, ensure_ascii=False)
+                       if e.details else None)
+            return
+        store = G['store']
+        task_id = store.new_task_id()
+        prompt = req.get('query') or req.get('prompt') or \
+            '（结构化请求）%s %s 用户%s' % (url_category, plan['algorithms'],
+                                          plan['user_ids'])
+        store.create(task_id, prompt, plan, task_type=plan['task_type'])
+        G['scheduler'].submit(task_id)
+        self._send_json({
+            'task_id': task_id,
+            'task_type': plan['task_type'],
+            'status': models.PENDING,
+            'message': '分析任务已创建，等待调度',
+            'understanding': plan['notes'],
+            'algorithms': plan['algorithms'],
+            'requested_user_ids': plan['user_ids'],
+        })
 
     def _create_task(self):
         req = self._read_body()
@@ -221,6 +265,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         resp = {
             'task_id': task_id,
+            'task_type': rec.get('task_type')
+                         or rec.get('plan', {}).get('task_type', 'cleaning'),
             'status': rec['status'],
             'stage': rec['stage'],
             'message': rec['message'],
@@ -265,6 +311,14 @@ class Handler(BaseHTTPRequestHandler):
             cfg = config.load_rules()
         except Exception:
             pass
+        analysis = {}
+        try:
+            acfg = config.load_analysis()
+            analysis = {'analysis_version': acfg['analysis_version'],
+                        'profile_version': acfg['profile_version'],
+                        'registered_tools': registry.implemented_tools(acfg)}
+        except Exception as e:
+            analysis = {'error': str(e)}
         self._send_json({
             'status': models.SUCCESS,
             'service': 'movielens-agent',
@@ -272,6 +326,7 @@ class Handler(BaseHTTPRequestHandler):
             'hadoop_url': G['tool'].base_url,
             'rule_version': cfg.get('rule_version') if cfg else None,
             'llm_enabled': bool(explainer.llm.enabled()),
+            'analysis': analysis,
             'scheduler': {'queue_size': G['scheduler'].q.qsize(),
                           'pending': G['store'].pending_ids()},
         })
@@ -308,10 +363,18 @@ def serve(host, port, hadoop_url):
     print('   T1/T2    : %s / %s（epoch %s / %s）' % (
         cfg['time']['T1'], cfg['time']['T2'],
         cfg['time']['T1_epoch'], cfg['time']['T2_epoch']))
+    try:
+        acfg = config.load_analysis()
+        print('   分析口径 : %s / %s（已注册工具: %s）' % (
+            acfg['analysis_version'], acfg['profile_version'],
+            '、'.join(registry.implemented_tools(acfg))))
+    except Exception as e:
+        print('   分析配置 : 读取失败 ->', e)
     if recovered:
         print('   恢复提醒 : 上次运行有 %d 个未完成任务，已如实标记为中断失败' % recovered)
     print('-' * 62)
     print('   POST /api/tasks')
+    print('   POST /api/analysis/{clustering|classification|dimensionality-reduction}/tasks')
     print('   GET  /api/tasks')
     print('   GET  /api/tasks/{task_id}')
     print('   GET  /api/tasks/{task_id}/result')

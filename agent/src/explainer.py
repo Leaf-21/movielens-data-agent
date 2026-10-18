@@ -16,6 +16,7 @@
 """
 
 import os
+import re
 import sys
 
 _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +46,22 @@ FAILURE_GUIDANCE = {
     'AGENT_EXECUTION_ERROR': 'Agent 调度环节失败。任务记录与已完成的中间结果仍可查看，'
                              '修正后可用同一 data_version 重新提交。',
     'INTERNAL_ERROR': '系统内部错误。请查看 error.detail 字段并联系开发成员。',
+    # 迭代二接口扩展规范 §2.1/§六 新增码的指引
+    'DATA_UNAVAILABLE': '清洗快照不可用。请确认 hadoop/output/clean/ 存在且为 '
+                        'movielens-1m-v2-clean-v1（可先重跑迭代一清洗任务）。',
+    'VERSION_MISMATCH': '数据/画像版本与分析口径不匹配。分析任务固定使用 '
+                        'analysis.json 登记的版本，请修正请求字段后重新提交。',
+    'UNKNOWN_USER': '目标用户不存在于 users.dat。请核对用户 ID 范围（1-6040）'
+                    '与清洗快照后重新提交。',
+    'UNKNOWN_MOVIE': '目标电影不存在于 movies.dat，请核对电影 ID。',
+    'INSUFFICIENT_HISTORY': '用户训练期评分数低于最小历史要求，画像不可用；'
+                            '系统未强行给出群体结论，可换用户或调低阈值（须重新登记口径）。',
+    'MODEL_NOT_FOUND': '该算法尚未在 agent/config/analysis.json 登记实现。'
+                       '聚类类别当前提供 kmeans/dbscan；分类与降维等成员A/C工具合入后自动生效。',
+    'INVALID_PARAMETER': '算法参数不在 analysis.json allowed_parameters 白名单或超出取值范围。'
+                         '请按 error.detail 中的允许清单修正。',
+    'ALGORITHM_ERROR': '算法子进程执行失败（含超时/崩溃且重试无效）。'
+                       'error.detail 记录退出码与 stderr 尾部，可据此排查后重新提交。',
 }
 
 
@@ -197,6 +214,202 @@ def build_evidence(record):
     }
 
 
+_ANALYSIS_TYPES = ('clustering', 'classification', 'dimensionality_reduction')
+_UID_RX = re.compile(r'(?:用户|user[_\s]*(?:id)?)[=：:\s]*(\d+)', re.I)
+_CLUSTER_RX = re.compile(r'(?:群体|簇|cluster)[\s=]*([0-9]+)', re.I)
+
+
+def _fmt_pct(v):
+    return 'null' if v is None else ('%.3f' % v)
+
+
+def analysis_summary_lines(result):
+    """分析任务通用摘要：每个算法一栏，数字全部取自结果信封。"""
+    lines = []
+    for e in result.get('results') or []:
+        mt = e.get('metrics') or {}
+        head = ('【%s】模型 %s / 结果 %s：拟合用户 %s 人'
+                % (e.get('algorithm_tool'), e.get('model_version'),
+                   e.get('result_version'), mt.get('n_fit_users')))
+        if e.get('algorithm') == 'kmeans':
+            head += '，选定 k=%s' % mt.get('k_selected')
+            if mt.get('silhouette_full') is not None:
+                head += ('，全量轮廓系数 %.4f，DBI %.3f，SSE %.0f'
+                         % (mt['silhouette_full'], mt['davies_bouldin_full'] or 0,
+                            mt['sse_full'] or 0))
+        elif e.get('algorithm') == 'dbscan':
+            head += ('，eps=%s（%s）/ min_samples=%s，簇数 %s，噪声 %s（占比 %s）'
+                     % (mt.get('eps_used'), mt.get('eps_method'),
+                        mt.get('min_samples'), mt.get('n_clusters'),
+                        mt.get('noise_count'),
+                        ('%.1f%%' % (100 * mt['noise_ratio']))
+                        if mt.get('noise_ratio') is not None else 'null'))
+        lines.append(head + '。')
+        for s in e.get('cluster_summaries') or []:
+            genres = '、'.join('%s %s' % (g['genre'], _fmt_pct(g['v']))
+                               for g in (s.get('top_genre_shares') or [])[:3])
+            reps = '、'.join('%s（%d 人高分）' % (m['title'], m['high_raters_in_cluster'])
+                             for m in (s.get('representative_movies') or [])[:3])
+            lines.append('  群体 %s：%s 人，均分 %s，高分占比 %s；类型Top: %s；'
+                         '代表作品: %s。'
+                         % (s.get('cluster_id'), s.get('size'),
+                            _fmt_pct(s.get('avg_rating_mean')),
+                            _fmt_pct(s.get('high_share_mean')), genres, reps))
+    if result.get('requested_user_ids'):
+        lines.append('本次请求用户：%s。' % result['requested_user_ids'])
+    return lines
+
+
+def analysis_answer(record, question):
+    """迭代二分析任务追问：模板主路径，数字只取自结果信封。"""
+    q = (question or '').strip()
+    low = q.lower()
+    result = record.get('result') or {}
+    envs = result.get('results') or []
+    lines = []
+    matched = False
+
+    # ---- 版本/时间边界 ----
+    if ('版本' in q or 'version' in low or 't1' in low or 't2' in low
+            or '划分' in q or '时间' in q):
+        matched = True
+        lines.append('数据版本 %s；画像版本 %s；分析口径 %s；代码 commit %s。'
+                     % (result.get('data_version'), result.get('profile_version'),
+                        result.get('analysis_version'), result.get('code_version')))
+        lines.append('训练期截止 T1=%s（epoch %s），验证期截止 T2=%s（epoch %s）；'
+                     '画像特征只用 Timestamp<=T1 记录。'
+                     % (result.get('T1'), result.get('T1_epoch'),
+                        result.get('T2'), result.get('T2_epoch')))
+        rv = result.get('result_versions') or {}
+        if rv:
+            lines.append('结果版本：%s。'
+                         % '、'.join('%s=%s' % kv for kv in sorted(rv.items())))
+
+    # ---- 指定用户归属 ----
+    for uid in {int(m.group(1)) for m in _UID_RX.finditer(q)}:
+        hit = False
+        for e in envs:
+            a = next((x for x in e.get('assignments') or []
+                      if x.get('user_id') == uid), None)
+            if not a:
+                continue
+            hit = True
+            cid = a.get('cluster_id')
+            seg = ('【%s】用户 %s：' % (e.get('algorithm_tool'), uid))
+            if cid is None:
+                seg += '无归属（状态 %s）' % a.get('status')
+            else:
+                seg += '属于群体 %s（状态 %s%s）' % (
+                    cid, a.get('status'),
+                    '，可靠性低' if a.get('reliability_low') else '')
+                dist = a.get('distance_to_centroid')
+                if dist is not None:
+                    seg += '，到质心距离 %.3f' % dist
+            if a.get('note'):
+                seg += '。说明：' + a['note']
+            lines.append(seg + '。')
+            if cid is not None:
+                s = next((x for x in e.get('cluster_summaries') or []
+                          if x.get('cluster_id') == cid), None)
+                if s:
+                    lines.append('  该群体真实统计：%s 人，均分 %s，高分占比 %s。'
+                                 % (s.get('size'), _fmt_pct(s.get('avg_rating_mean')),
+                                    _fmt_pct(s.get('high_share_mean'))))
+        if not hit:
+            lines.append('结果中没有用户 %d 的归属记录（追问只基于已执行结果，'
+                         '不为未计算的用户编造结论）。' % uid)
+        matched = True
+
+    # ---- 指定群体 ----
+    for ck in {int(m.group(1)) for m in _CLUSTER_RX.finditer(q)}:
+        hit = False
+        for e in envs:
+            s = next((x for x in e.get('cluster_summaries') or []
+                      if x.get('cluster_id') == ck), None)
+            if not s:
+                continue
+            hit = True
+            genres = '、'.join('%s %s' % (g['genre'], _fmt_pct(g['v']))
+                               for g in (s.get('top_genre_shares') or []))
+            reps = '、'.join('%s（%d 人高分）'
+                            % (m['title'], m['high_raters_in_cluster'])
+                            for m in (s.get('representative_movies') or []))
+            lines.append('【%s】群体 %s：%s 人，平均评分 %s，'
+                         '高分占比 %s，活跃跨度均值 %s 天；类型占比：%s；代表作品：%s。'
+                         % (e.get('algorithm_tool'), ck, s.get('size'),
+                            _fmt_pct(s.get('avg_rating_mean')),
+                            _fmt_pct(s.get('high_share_mean')),
+                            _fmt_pct(s.get('active_span_days_mean')),
+                            genres or '—', reps or '—'))
+            lines.append('  依据：%s' % s.get('summary_basis'))
+        if not hit:
+            lines.append('群体 %d 不存在于当前结果（不同算法的簇号互不相通，'
+                         '请指明算法或以用户归属为准）。' % ck)
+        matched = True
+
+    # ---- 指标/噪声/参数选择 ----
+    if (any(k in low for k in ('指标', '轮廓', 'silhouette', 'dbi', 'davies', 'sse',
+                               '噪声', 'noise', 'eps', 'k选', '选k', '参数怎么选',
+                               'how many clusters')) or '指标' in q or '噪声' in q):
+        matched = True
+        for e in envs:
+            mt = e.get('metrics') or {}
+            parts = []
+            if e.get('algorithm') == 'kmeans':
+                parts = ['选定 k=%s' % mt.get('k_selected'),
+                         '全量轮廓系数 %s' % _fmt_pct(mt.get('silhouette_full')),
+                         'DBI %s' % _fmt_pct(mt.get('davies_bouldin_full')),
+                         'SSE %s' % (mt.get('sse_full') and round(mt['sse_full'], 1))]
+                tbl = mt.get('k_selection_table') or []
+                if tbl and ('k' in low or '选' in q or '轮廓' in q):
+                    parts.append('候选表：' + '；'.join(
+                        'k=%d sil≈%s' % (t['k'],
+                                          _fmt_pct(t['silhouette_sampled']))
+                        for t in tbl))
+            elif e.get('algorithm') == 'dbscan':
+                parts = ['eps=%s（%s）' % (mt.get('eps_used'), mt.get('eps_method')),
+                         'min_samples=%s' % mt.get('min_samples'),
+                         '簇数 %s' % mt.get('n_clusters'),
+                         '噪声 %s（%s）' % (mt.get('noise_count'),
+                                          _fmt_pct(mt.get('noise_ratio'))),
+                         '轮廓系数 %s' % _fmt_pct(mt.get('silhouette_full'))]
+            lines.append('【%s】%s。' % (e.get('algorithm_tool'), '，'.join(parts)))
+            defn = (mt.get('definition') or {}).get('silhouette')
+            if defn and '轮廓' in q:
+                lines.append('  口径：' + defn)
+
+    # ---- 参数 ----
+    if '参数' in q or 'parameter' in low:
+        matched = True
+        for e in envs:
+            lines.append('【%s】生效参数：%s。' % (e.get('algorithm_tool'),
+                                               e.get('parameters')))
+
+    # ---- 局限 ----
+    if any(k in q for k in ('局限', '不足', '风险', '为什么不能')):
+        matched = True
+        for e in envs:
+            lines.append('【%s】局限：' % e.get('algorithm_tool'))
+            lines.extend('  - ' + x for x in e.get('limitations') or [])
+
+    if not matched:
+        lines.extend(analysis_summary_lines(result))
+        source = 'template'
+        if llm.enabled():
+            ev = {'task_id': record.get('task_id'), 'status': record.get('status'),
+                  'algorithms': [{k: e.get(k) for k in
+                                  ('algorithm_tool', 'model_version',
+                                   'result_version', 'parameters', 'metrics',
+                                   'cluster_summaries', 'limitations')}
+                                 for e in envs]}
+            extra = llm.answer_question(q, ev)
+            if extra:
+                lines.append('以下补充回答由大模型基于上述真实结果证据生成：\n' + extra)
+                source = 'template+llm'
+        return '\n'.join(lines), source
+    return '\n'.join(lines), 'template'
+
+
 def answer(record, question):
     """
     返回 (answer_text, source)。source ∈ template / llm / template+llm。
@@ -204,6 +417,22 @@ def answer(record, question):
     """
     q = (question or '').strip()
     status = record.get('status')
+
+    # ---- 迭代二：分析任务按 task_type 分发到专用模板 ----
+    task_type = record.get('task_type') or record.get('plan', {}).get('task_type')
+    if task_type in _ANALYSIS_TYPES:
+        if status == FAILED:
+            return '\n'.join(failure_answer(record)), 'template'
+        if status in (PENDING, RUNNING):
+            stage = record.get('stage')
+            notes = record.get('plan', {}).get('notes') or ''
+            text = ('分析任务尚未完成（状态 %s，环节：%s）。聚类拟合可能需要数分钟。'
+                    % (status, stage or '排队中'))
+            if notes:
+                text += '\nAgent 对本需求的理解：' + (
+                    ' '.join(notes) if isinstance(notes, list) else notes)
+            return text, 'template'
+        return analysis_answer(record, q)
 
     if status == FAILED:
         return '\n'.join(failure_answer(record)), 'template'
