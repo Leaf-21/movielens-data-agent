@@ -193,7 +193,7 @@
   "n_train_ratings_used": 700148,
   "global_train_mean_rating": 3.60188131652165,
   "config_fingerprint": "[\"profile-v1\", 10, [\"n_ratings\", \"avg_rating\", \"std_rating\", \"rating_bias\", \"high_share\", \"avg_movie_pop\", \"share_top_pop\", \"active_span_days\", \"avg_gap_days\", \"genre_share_action\", \"genre_share_adventure\", \"genre_share_animation\", \"genre_share_childrens\", \"genre_share_comedy\", \"genre_share_crime\", \"genre_share_documentary\", \"genre_share_drama\", \"genre_share_fantasy\", \"genre_share_film-noir\", \"genre_share_horror\", \"genre_share_musical\", \"genre_share_mystery\", \"genre_share_romance\", \"genre_share_sci-fi\", \"genre_share_thriller\", \"genre_share_war\", \"genre_share_western\"], 974862386]",
-  "code_version": "b920f1d",
-  "created_at": "2026-10-18T10:19:41Z",
+  "code_version": "3c7c210",
+  "created_at": "2026-10-18T11:36:16Z",
   "window_note": "特征只用 Timestamp<=T1 训练期记录（数据与实验规范 §四.1）"
 }

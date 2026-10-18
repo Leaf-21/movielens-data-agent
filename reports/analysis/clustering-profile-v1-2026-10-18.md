@@ -1,6 +1,6 @@
 # 迭代二聚类真实运行记录（clustering / profile-v1 / 2026-10-18）
 
-- 生成时间（UTC）：2026-10-18T10:51:47Z；代码 commit：b920f1d
+- 生成时间（UTC）：2026-10-18T11:37:16Z；代码 commit：3c7c210
 - 分析口径：iter2-analysis-v1；数据版本：movielens-1m-v2-clean-v1；画像版本：profile-v1
 - 时间边界：T1=2000-11-22（epoch 974862386）/ T2=2000-12-10（epoch 976422054）；画像特征只使用 Timestamp<=T1 的训练期记录。
 - 运行方式：`python3 -I agent/tools/clustering/run_fit.py`（本报告全部数字来自本次真实运行，非示例/非估算）。
@@ -17,7 +17,7 @@
 | 孤儿引用（评分但不在 users.dat） | 13：[1259, 1434, 2106, 2853, 3355, 3905, 4454, 4538, 4913, 4973, 5100, 5510, 5904] |
 | 特征维度 | 27 |
 | 训练期全局均分 | 3.6019 |
-| 构建耗时 | 0 s（本次输入哈希未变，缓存复用） |
+| 构建耗时 | 1.4 s |
 | 画像文件 | agent/artifacts/profiles/profile-v1.jsonl（6025 行） |
 | 画像 sha256 | `b5665c179a831ab968201e4ff7c2044d9b86e155368486b685479386a8b72b6d` |
 
@@ -36,7 +36,7 @@
 | 7 | 0.0912 | 92269.505 | 1.936 | 32 | True | 0 |
 | 8 | 0.092 | 88406.1488 | 2.044 | 34 | True | 0 |
 
-- 选定 **k=6**；全量轮廓系数 **0.1199**，DBI **1.935**，SSE **94764.7**；拟合 4783 人，耗时 18561 ms。
+- 选定 **k=6**；全量轮廓系数 **0.1199**，DBI **1.935**，SSE **94764.7**；拟合 4783 人，耗时 18713 ms。
 - 本次目标用户 6025 人全部有归属（含按最近质心参考分配的历史不足/无训练记录用户，其 reliability_low 标注见工件）。
 - 群体摘要（真实统计）：
 
@@ -63,7 +63,7 @@
 | p95 | 5.2834 |
 | max | 11.8554 |
 
-- 默认 eps=**4.3278**（k-距离 P90）下：簇数 **1**、噪声 **223**（占比 0.047）、轮廓系数 null；耗时 17828 ms。
+- 默认 eps=**4.3278**（k-距离 P90）下：簇数 **1**、噪声 **223**（占比 0.047）、轮廓系数 null；耗时 18450 ms。
 - 如实结论：当前画像特征 + 默认参数下 DBSCAN 只形成 1 个密度巨簇（chaining 效应），群体划分主视角应以 K-Means 为准；DBSCAN 的价值在噪声侧写（223 个孤立用户未强塞进群）。
 
 ### 3.1 eps 敏感性探针（同一 min_samples=15）
@@ -84,10 +84,10 @@
 
 ## 5. 工件清单
 
-- `agent/artifacts/clustering/clusters-kmeans-v1.json`（sha256 `a183196eac81bf48f281cae83a2548ec3679747a058354de9533a931c8e98240`）— 统一结果信封（全量 6025 用户归属 + 群体摘要）
-- `agent/artifacts/clustering/clusters-kmeans-v1.meta.json`（sha256 `7a8fc69c580f076f9892893459a8dd97047a741e041cef5a16fec434238f90d3`）— 工件登记（版本/哈希/指标摘要）
-- `agent/artifacts/clustering/clusters-dbscan-v1.json`（sha256 `7d5e1aee5c6e319cfbfd9789fa3fd9ab95ea2f0d8bf2ee134e59c053802096a3`）— 统一结果信封（全量 6025 用户归属 + 群体摘要）
-- `agent/artifacts/clustering/clusters-dbscan-v1.meta.json`（sha256 `c8a1268276455a96f86f2c980dbcab223b1264cccc3f9390006db432bc69570e`）— 工件登记（版本/哈希/指标摘要）
+- `agent/artifacts/clustering/clusters-kmeans-v1.json`（sha256 `78bc35f533bcfc0d1d8e2266d8fdca175084a4976ee5655de721e5d7282b52b1`）— 统一结果信封（全量 6025 用户归属 + 群体摘要）
+- `agent/artifacts/clustering/clusters-kmeans-v1.meta.json`（sha256 `c3422014cd1be236bed1249eb26264dea31987b2238e6edc27148d91dcfd22aa`）— 工件登记（版本/哈希/指标摘要）
+- `agent/artifacts/clustering/clusters-dbscan-v1.json`（sha256 `58a48aaf7958e7caf70f8235935b8860fb79f92b6dd3d6f0f67561e5c1255938`）— 统一结果信封（全量 6025 用户归属 + 群体摘要）
+- `agent/artifacts/clustering/clusters-dbscan-v1.meta.json`（sha256 `f973df53651e2e63578d771ad3cb199969b9454b54a199c523ce9e574d12aa14`）— 工件登记（版本/哈希/指标摘要）
 
 ## 6. 复现命令
 

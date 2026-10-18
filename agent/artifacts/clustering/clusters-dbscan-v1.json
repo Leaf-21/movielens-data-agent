@@ -14,8 +14,8 @@
   "profile_version": "profile-v1",
   "T1": "2000-11-22",
   "T2": "2000-12-10",
-  "code_version": "b920f1d",
-  "created_at": "2026-10-18T10:51:25Z",
+  "code_version": "3c7c210",
+  "created_at": "2026-10-18T11:36:53Z",
   "fit_scope": {
     "population": "profile-v1 中 status=OK 的训练期画像用户",
     "n_fit_users": 4783,
@@ -43797,5 +43797,5 @@
     "本次 eps=4.3278/min_samples=15 下仅得到 1 个密度簇，轮廓系数与 DBI 不适用（null），可显式调参重试。"
   ],
   "algorithm_source": "经典密度聚类（支持噪声标记）；课程 PPT 章节/页码待团队核对后登记",
-  "elapsed_ms": 17814
+  "elapsed_ms": 18435
 }

@@ -1,9 +1,9 @@
 {
   "artifact": "clusters-kmeans-v1",
   "artifact_kind": "analysis_result_envelope",
-  "generated_at": "2026-10-18T10:51:47Z",
+  "generated_at": "2026-10-18T11:37:16Z",
   "generated_by": "agent/tools/clustering/run_fit.py",
-  "code_version": "b920f1d",
+  "code_version": "3c7c210",
   "data_version": "movielens-1m-v2-clean-v1",
   "profile_version": "profile-v1",
   "analysis_version": "iter2-analysis-v1",
@@ -20,7 +20,7 @@
     "sse_full": 94764.74760230673,
     "n_fit_users": 4783
   },
-  "elapsed_ms": 18561,
-  "json_sha256": "a183196eac81bf48f281cae83a2548ec3679747a058354de9533a931c8e98240",
+  "elapsed_ms": 18713,
+  "json_sha256": "78bc35f533bcfc0d1d8e2266d8fdca175084a4976ee5655de721e5d7282b52b1",
   "eps_probe_metrics": null
 }

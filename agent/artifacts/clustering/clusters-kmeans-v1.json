@@ -24,8 +24,8 @@
   "profile_version": "profile-v1",
   "T1": "2000-11-22",
   "T2": "2000-12-10",
-  "code_version": "b920f1d",
-  "created_at": "2026-10-18T10:51:08Z",
+  "code_version": "3c7c210",
+  "created_at": "2026-10-18T11:36:35Z",
   "fit_scope": {
     "population": "profile-v1 中 status=OK 的训练期画像用户",
     "n_fit_users": 4783,
@@ -44091,5 +44091,5 @@
     "训练期有 13 个评分用户不在 users.dat（迭代一孤儿引用），未纳入画像与拟合域，详见画像 meta.orphan_user_ids。"
   ],
   "algorithm_source": "经典划分聚类；课程 PPT 章节/页码待团队核对后登记（不得凭惯例声称）",
-  "elapsed_ms": 18544
+  "elapsed_ms": 18695
 }
