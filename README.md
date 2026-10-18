@@ -48,11 +48,19 @@ movielens-data-agent/
 
 ## 项目文档
 
-- [《GitHub 团队协作开发指导文档》](docs/GitHub%20团队协作开发指导文档.md) — 团队协作与 GitHub 开发规范
-- [《迭代一项目分工文档》](docs/迭代一项目分工文档.md) — 三人分工与职责
 - [《引言_项目总体要求与汇报安排》](docs/引言_项目总体要求与汇报安排.md) — 课程总体要求与汇报安排
-- [《迭代一_Hadoop数据清洗与Agent基础》](docs/迭代一_Hadoop数据清洗与Agent基础.md) — 迭代一需求说明
-- [《接口规范文档》](docs/接口规范文档.md) — Frontend ↔ Agent ↔ Hadoop Tool 三层接口定义（三人并行开发共同依据）
+
+迭代一（docs/迭代一/）：
+- [《迭代一_Hadoop数据清洗与Agent基础》](docs/迭代一/迭代一_Hadoop数据清洗与Agent基础.md) — 迭代一需求说明
+- [《迭代一项目分工文档》](docs/迭代一/分工/迭代一项目分工文档.md) — 三人分工与职责
+- [《接口规范文档》](docs/迭代一/分工/接口规范文档.md) — Frontend ↔ Agent ↔ Hadoop Tool 三层接口定义（三人并行开发共同依据）
+- [《GitHub 团队协作开发指导文档》](docs/迭代一/分工/GitHub%20团队协作开发指导文档.md) — 团队协作与 GitHub 开发规范
+- [《evaluation-method》](docs/迭代一/交付文档/evaluation-method.md) · [《流程与Prompt设计》](docs/迭代一/交付文档/流程与Prompt设计.md) · [《演示脚本》](docs/迭代一/交付文档/演示脚本.md) — 成员交付文档
+
+迭代二（docs/迭代二/）：
+- [《迭代二_分类聚类降维与分析Agent》](docs/迭代二/迭代二_分类聚类降维与分析Agent.md) — 迭代二需求说明
+- [《迭代二项目分工文档》](docs/迭代二/分工/迭代二项目分工文档.md) — 迭代二三人分工与职责
+- 迭代二分工作品另含：接口扩展规范、数据与实验规范、测试与验收清单、GitHub协作与提交计划及三份成员任务书（见 docs/迭代二/分工/）
 
 ## 数据说明
 
@@ -72,7 +80,7 @@ movielens-data-agent/
 
 ## 开发流程
 
-团队采用 **Issue + Branch + Commit + Pull Request + Code Review + main** 协作模式。`main` 为稳定分支，禁止直接提交，所有功能通过 `feature/*`、`fix/*`、`docs/*`、`test/*` 分支经 Pull Request 审核后合并。规范详见 [《GitHub 团队协作开发指导文档》](docs/GitHub%20团队协作开发指导文档.md)。
+团队采用 **Issue + Branch + Commit + Pull Request + Code Review + main** 协作模式。`main` 为稳定分支，禁止直接提交，所有功能通过 `feature/*`、`fix/*`、`docs/*`、`test/*` 分支经 Pull Request 审核后合并。规范详见 [《GitHub 团队协作开发指导文档》](docs/迭代一/分工/GitHub%20团队协作开发指导文档.md)。
 
 ## 运行环境与使用方法
 
@@ -103,7 +111,7 @@ python3 frontend/src/serve.py --port 8000 --agent-url http://127.0.0.1:8090
 
 浏览器访问 **http://localhost:8000** 即可使用。三个服务都有 `GET /health` 可用于自检。
 
-WSL 一键脚本（成员C提供）：`scripts_setup/install_hadoop.sh` → `sync_to_wsl.sh` → `start_all_wsl.sh`，停止用 `stop_all_wsl.sh`；注意脚本内路径按执行机环境可能需微调。演示口令与预期输出口径见 `docs/演示脚本.md`。
+WSL 一键脚本（成员C提供）：`scripts_setup/install_hadoop.sh` → `sync_to_wsl.sh` → `start_all_wsl.sh`，停止用 `stop_all_wsl.sh`；注意脚本内路径按执行机环境可能需微调。演示口令与预期输出口径见 `docs/迭代一/交付文档/演示脚本.md`。
 
 ### 验证与测试
 
