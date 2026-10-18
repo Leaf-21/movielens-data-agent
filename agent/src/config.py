@@ -44,9 +44,11 @@ AGENT_PORT = int(os.environ.get('ML_AGENT_PORT', '8090'))
 #   1. ML_RULES 环境变量  2. hadoop/config/rules.json
 RULES_PATH_DEFAULT = os.path.join(REPO_DIR, 'hadoop', 'config', 'rules.json')
 VERSIONS_PATH = os.path.join(AGENT_DIR, 'config', 'versions.json')
+ANALYSIS_PATH_DEFAULT = os.path.join(AGENT_DIR, 'config', 'analysis.json')
 
 _RULES_CACHE = None
 _VERSIONS_CACHE = None
+_ANALYSIS_CACHE = None
 
 
 def rules_path():
@@ -84,6 +86,37 @@ def load_versions_registry():
 def rules_weights(cfg):
     """从 rules.json 提取五维权重（过滤掉 _comment 类说明键）。"""
     return {k: float(v) for k, v in cfg['weights'].items() if not k.startswith('_')}
+
+
+# ---------------------------------------------------------------------------
+# 迭代二分析配置（agent/config/analysis.json）
+# ---------------------------------------------------------------------------
+
+def analysis_path():
+    return os.environ.get('ML_ANALYSIS_CONFIG') or ANALYSIS_PATH_DEFAULT
+
+
+def load_analysis():
+    """读取迭代二分析配置。缺失/不可解析直接抛错，绝不静默用内置口径。"""
+    global _ANALYSIS_CACHE
+    if _ANALYSIS_CACHE is not None:
+        return _ANALYSIS_CACHE
+    p = analysis_path()
+    if not os.path.exists(p):
+        raise RuntimeError(
+            '[agent.config] 找不到分析配置 analysis.json: %s\n'
+            '  画像口径、聚类参数与产物路径以该文件为准，不允许使用内置默认值。' % p)
+    with open(p, 'r', encoding='utf-8') as f:
+        cfg = json.load(f)
+    _ANALYSIS_CACHE = cfg
+    return cfg
+
+
+def resolve_repo_path(rel):
+    """把 analysis.json 里的仓库相对路径解析为绝对路径。
+    ML_ANALYSIS_BASE 允许测试用夹具目录替换仓库根（默认真实仓库根）。"""
+    base = os.environ.get('ML_ANALYSIS_BASE') or REPO_DIR
+    return os.path.join(base, *rel.split('/'))
 
 
 # ---------------------------------------------------------------------------

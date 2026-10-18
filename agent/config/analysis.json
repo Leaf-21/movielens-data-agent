@@ -1,0 +1,90 @@
+{
+  "_comment": "迭代二分析任务的统一配置（成员B）。数据/规则版本仍以来自 hadoop/config/rules.json 与 agent/config/versions.json 为准；本文件只登记画像口径、算法参数与产物路径。依据 docs/迭代二/分工/迭代二数据与实验规范.md：T1/T2 运行时读取项目登记值，不在本文件写死日历值。",
+  "analysis_version": "iter2-analysis-v1",
+
+  "input": {
+    "data_version": "movielens-1m-v2-clean-v1",
+    "clean_dir": "hadoop/output/clean",
+    "_note": "清洗快照路径相对仓库根；行数以 versions.json 登记值为参考做完整性核对，不一致 -> DATA_UNAVAILABLE"
+  },
+
+  "profile_version": "profile-v1",
+  "min_train_ratings": 10,
+  "fit_window": "train_only",
+  "_fit_window_note": "画像与聚类拟合只使用 Timestamp <= T1 的训练期记录（迭代二数据与实验规范 §二/§四）；验证期(T1,T2]仅用于参数选择时的漂移对照，不进入拟合。",
+
+  "feature_dict": {
+    "n_ratings":          {"cn": "训练期评分数", "formula": "count(Timestamp<=T1)", "missing": "0", "window": "train"},
+    "avg_rating":         {"cn": "平均评分", "formula": "mean(Rating)", "missing": "仅对有评分用户计算", "window": "train"},
+    "std_rating":         {"cn": "评分标准差", "formula": "pstd(Rating)，n<2 记 0", "missing": "0", "window": "train"},
+    "rating_bias":        {"cn": "相对全局的评分偏移", "formula": "avg_rating - 训练期全局平均分", "missing": "0", "window": "train"},
+    "high_share":         {"cn": "高分占比", "formula": "count(Rating>=4)/n_ratings", "missing": "0", "window": "train"},
+    "avg_movie_pop":      {"cn": "所看电影平均热度(log1p)", "formula": "mean(log1p(该电影训练期评分数))", "missing": "0", "window": "train"},
+    "share_top_pop":      {"cn": "头部热度电影占比", "formula": "所看电影中训练期热度前四分位的占比", "missing": "0", "window": "train"},
+    "active_span_days":   {"cn": "活跃跨度天数", "formula": "(max_ts-min_ts)/86400，单条记 0", "missing": "0", "window": "train"},
+    "avg_gap_days":       {"cn": "平均评分间隔天数", "formula": "span/(n-1)，单条记 0", "missing": "0", "window": "train"},
+    "genre_share_<G>":    {"cn": "18 个类型的评分占比（逐列）", "formula": "count(含类型G的已评分电影)/n_unique_movies", "missing": "0", "window": "train", "source": "hadoop/config/rules.json genres.valid（与清洗校验同一词表）"},
+    "_excluded": "users.dat 的性别/年龄/职业/邮编未纳入 v1 聚类特征：迭代一评价局限已确认属性真实性无法核验，且为注册期静态信息；记录于 limitations。"
+  },
+
+  "scaler": "zscore_fit_on_ok_users",
+  "_scaler_note": "均值/标准差只由画像可用(历史>=min_train_ratings)用户计算并保存于画像元数据；std=0 的列在缩放后记 0。新用户应用同一组统计量，不重新拟合。",
+
+  "algorithms": {
+    "clustering": {
+      "kmeans": {
+        "module": "clustering.kmeans_tool",
+        "entry": "run",
+        "parameters": {
+          "k_candidates": [2, 3, 4, 5, 6, 7, 8],
+          "seed": 42,
+          "max_iter": 100,
+          "tol": 1e-06,
+          "init": "kmeans++",
+          "silhouette_sample_size": 800,
+          "timeout_s": 600
+        },
+        "selection_rule": "对每个候选 k 在拟合集合上跑 kmeans++（确定性种子），按确定性抽样 800 人的轮廓系数估计选最大者（同分取较小 k）；选定 k 另在全体拟合用户上复算全量轮廓系数与 DBI；完整候选表写入 metrics.k_selection_table（验证期漂移对照见 validation_drift）",
+        "algorithm_source": "经典划分聚类；课程 PPT 章节/页码待团队核对后登记（不得凭惯例声称）"
+      },
+      "dbscan": {
+        "module": "clustering.dbscan_tool",
+        "entry": "run",
+        "parameters": {
+          "min_samples": 15,
+          "eps_method": "kdistance_p90",
+          "eps_sample_size": 800,
+          "seed": 42,
+          "timeout_s": 900
+        },
+        "selection_rule": "eps 取确定性抽样(种子42, 800人)的 k 距离(min_samples 最近邻)第 90 百分位；eps 值与抽样表写入 metrics",
+        "algorithm_source": "经典密度聚类（支持噪声标记）；课程 PPT 章节/页码待团队核对后登记"
+      }
+    },
+    "classification": {
+      "_note": "成员A的两个分类工具尚未合入。登记位保持为空，registry 在调用时返回 MODEL_NOT_FOUND；A 的工具落位到 agent/tools/classification/ 后按同名约定自动生效。",
+      "algorithms": {}
+    },
+    "dimensionality_reduction": {
+      "_note": "成员C的两个降维工具同上。",
+      "algorithms": {}
+    }
+  },
+
+  "allowed_parameters": {
+    "kmeans": {"k": [2, 30], "max_iter": [10, 1000], "seed": [0, 2147483647]},
+    "dbscan": {"eps": [0.01, 50.0], "min_samples": [3, 100]}
+  },
+
+  "artifacts": {
+    "profiles_dir": "agent/artifacts/profiles",
+    "clusters_dir": "agent/artifacts/clustering",
+    "report_dir": "reports/analysis"
+  },
+
+  "representative_movies": {
+    "top_n": 5,
+    "min_member_votes": 3,
+    "basis": "群成员训练期 Rating>=4 的计数（同分按电影热度排序）；代表性内容 = 高频高分电影，不代表因果偏好"
+  }
+}
