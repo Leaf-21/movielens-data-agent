@@ -75,16 +75,16 @@ agent/
 
 ## 四、交付清单
 
-- [ ] 两种聚类算法工具独立运行并记录参数/版本
-- [ ] 可复现的用户画像构建流程
-- [ ] 用户群体归属、群体摘要和代表性内容
-- [ ] 聚类评价指标及适用限制
-- [ ] 六种算法工具注册表/调用映射
-- [ ] 三类自然语言请求的路由规则
-- [ ] 统一任务 ID、状态、结果查询和错误封装
-- [ ] 未指定算法时双算法对照；指定算法时仅调用对应算法
-- [ ] 数据不可用、用户不存在、历史不足、模型未生成等异常行为
-- [ ] 与前端联调说明和可复现调用示例
+- [x] 两种聚类算法工具独立运行并记录参数/版本（`agent/tools/clustering/`；mdl/res 版本见 §六与 `versions.json`；测试 `test_kmeans_tool.py`/`test_dbscan_tool.py`）
+- [x] 可复现的用户画像构建流程（`build_profile.py` + `run_fit.py`；profile-v1 sha256 登记，HEAD 3c7c210 复跑字节不变，见提交 072e654）
+- [x] 用户群体归属、群体摘要和代表性内容（信封 `assignments`/`cluster_summaries`，`summary_basis` 口径原文；报告 §1/§2）
+- [x] 聚类评价指标及适用限制（`metrics.definition` 逐指标；不适用如实 null；噪声/eps 敏感性见报告 §3）
+- [ ] 六种算法工具注册表/调用映射——B 侧统一注册机制已完成并有测试（`registry.py`+`analysis.json`，未登记类别诚实回 `MODEL_NOT_FOUND`）；分类/降维四工具**待成员A/C交付后登记**，登记即自动激活
+- [x] 三类自然语言请求的路由规则（`router.py`；聚类/分类/降维识别、误类别引导、指定/默认双算法；`test_registry_router.py` 19 用例）
+- [x] 统一任务 ID、状态、结果查询和错误封装（复用迭代一 `GET /api/tasks/{id}`；§2.1 错误码；拒绝路径零僵尸任务实测）
+- [x] 未指定算法时双算法对照；指定算法时仅调用对应算法（实测 task_20261018_0003 双对照 / _0013、_0014 指定单算法）
+- [x] 数据不可用、用户不存在、历史不足、模型未生成等异常行为（`test_analysis_api.py` E2E + 联调会话实测：UNKNOWN_USER/INVALID_PARAMETER/VERSION_MISMATCH/MODEL_NOT_FOUND；NO_TRAIN/INSUFFICIENT 状态见真实任务）
+- [x] 与前端联调说明和可复现调用示例（**`docs/迭代二/交付文档/成员B_前端联调说明.md`**；复现命令见实验记录 §6 与联调说明 §8）
 
 ## 五、提交与协作
 
