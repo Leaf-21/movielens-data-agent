@@ -1,7 +1,7 @@
 # 迭代二聚类真实运行记录（clustering / profile-v1 / 2026-10-18）
 
 - 生成时间（UTC）：2026-10-18T11:37:16Z；代码 commit：3c7c210
-- 分析口径：iter2-analysis-v1；数据版本：movielens-1m-v2-clean-v1；画像版本：profile-v1
+- 分析口径：iter2-analysis-v1；数据版本：movielens-1m-v2-clean-v1；清洗规则版本：rule-v2；画像版本：profile-v1
 - 时间边界：T1=2000-11-22（epoch 974862386）/ T2=2000-12-10（epoch 976422054）；画像特征只使用 Timestamp<=T1 的训练期记录。
 - 运行方式：`python3 -I agent/tools/clustering/run_fit.py`（本报告全部数字来自本次真实运行，非示例/非估算）。
 

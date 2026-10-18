@@ -93,9 +93,11 @@ def build_report(date, prof_path, meta, km, db, probes, artifacts, timings):
     L.append('')
     L.append('- 生成时间（UTC）：%s；代码 commit：%s' % (now_utc(),
                                                        code_version()))
-    L.append('- 分析口径：%s；数据版本：%s；画像版本：%s'
+    L.append('- 分析口径：%s；数据版本：%s；清洗规则版本：%s；画像版本：%s'
              % (config.load_analysis()['analysis_version'],
-                meta['data_version'], meta['profile_version']))
+                meta['data_version'],
+                config.load_rules().get('rule_version', '未登记'),
+                meta['profile_version']))
     L.append('- 时间边界：T1=%s（epoch %s）/ T2=%s（epoch %s）；'
              '画像特征只使用 Timestamp<=T1 的训练期记录。'
              % (meta['T1'], meta['T1_epoch'], meta['T2'], meta['T2_epoch']))
