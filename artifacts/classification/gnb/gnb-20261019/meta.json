@@ -63,7 +63,7 @@
     "age_ordinal",
     "has_user_attrs"
   ],
-  "code_commit": "f1f4ec1",
+  "code_commit": "b0e803e",
   "trained_at": "2026-10-19T11:25:09",
   "threshold": 0.42051,
   "threshold_policy": "验证期最大化 F1，且预测正类比例 <= 1.10 x 真实正类比例",

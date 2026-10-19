@@ -13,7 +13,7 @@
     "max_depth": 12,
     "min_samples_leaf": 100
   },
-  "code_commit": "f1f4ec1",
+  "code_commit": "b0e803e",
   "metrics": {
     "validation": {
       "roc_auc": 0.776822,
