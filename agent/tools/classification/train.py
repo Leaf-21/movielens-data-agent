@@ -82,13 +82,15 @@ def update_registry(path, slug, meta):
     模型文件本身不进 Git（`artifacts/` 已忽略），因此把路径、SHA256、版本与
     关键指标登记到仓库内的这份 JSON，供成员B/C 与迭代三定位产物。
     """
-    registry = {'models': {}}
+    registry = {'artifact_storage': '模型文件随 Git 仓库提交于 artifacts/classification/<algorithm>/<model_version>/；'
+                                   '重训生成新的 model_version 目录，不覆盖历史版本。'}
     if os.path.exists(path):
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 registry = json.load(f)
         except ValueError:
             registry = {'models': {}}
+    registry.setdefault('artifact_storage', '随仓库提交（artifacts/classification/）')
     if 'models' not in registry:
         registry['models'] = {}
     registry['models'][slug] = {

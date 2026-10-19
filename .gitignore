@@ -30,9 +30,9 @@ venv/
 # Agent 运行产物（任务状态/结果快照，不入库）
 agent/runtime/
 
-# 迭代二模型产物（体积较大，不入库；路径与 SHA256 登记在 reports/classification/）
-artifacts/
-
+# 迭代二模型产物：随仓库提交（当前约 280 KB），便于成员 clone 后直接 predict。
+# 若将来模型体积显著增大，改为外部归档并在 reports/classification/model-registry.json
+# 登记获取方式。
 # 测试用临时快照目录
 .test-tmp/
 
