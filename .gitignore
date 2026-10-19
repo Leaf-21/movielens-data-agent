@@ -30,6 +30,12 @@ venv/
 # Agent 运行产物（任务状态/结果快照，不入库）
 agent/runtime/
 
+# 迭代二模型产物（体积较大，不入库；路径与 SHA256 登记在 reports/classification/）
+artifacts/
+
+# 测试用临时快照目录
+.test-tmp/
+
 # Hadoop 服务运行期写入的任务交接文件；保留任务参考件 task_001.json
 reports/quality-report/*
 !reports/quality-report/task_001.json

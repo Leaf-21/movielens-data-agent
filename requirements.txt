@@ -1,0 +1,9 @@
+# 迭代二分析依赖（分类、聚类、降维共用）
+#
+# 迭代一三个服务（Hadoop 服务层 / Agent API / 前端）仍然只用标准库；
+# 本文件只服务于迭代二的分析工具，安装后即可运行 train.py / predict.py。
+#
+#   python3 -m pip install -r requirements.txt
+
+numpy>=1.24
+scikit-learn>=1.3

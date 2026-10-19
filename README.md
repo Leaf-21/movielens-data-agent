@@ -87,6 +87,8 @@ movielens-data-agent/
 ### 环境要求
 
 - **Python ≥ 3.10**：三个服务（Hadoop 服务层 / Agent API / 前端）全部只用标准库，**零第三方依赖**；
+- **迭代二分析工具额外需要** `requirements.txt`（numpy、scikit-learn）：分类、聚类、降维的训练与预测要用，
+  `python3 -m pip install -r requirements.txt` 即可；不安装不影响迭代一三件套的运行；
 - **清洗任务额外需要**：WSL（Ubuntu）或 Linux 环境 + Hadoop 3.4.1 + JDK（8/11/17 均可）。只评估（不清洗）的任务无需 Hadoop；
 - 前端渲染测试可选装 Node（`tests/run_all.py` 会自动检测，无 Node 时跳过该块）。
 
