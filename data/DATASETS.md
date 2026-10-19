@@ -34,6 +34,22 @@
 
 > ⚠️ v1 的 `users.dat` 为 6,040 行；本项目上一轮清洗产物（`_baseline_v1/`）中的 6,025 行是"15 条 Zip-code 异常被隔离"之后的结果，二者不是同一层级，比较时不要混用。
 
+### movielens-1m-v2-clean-v1（迭代二/三输入）
+
+迭代一 Hadoop 清洗产物，规则版本 `rule-v2`。仓库内默认读取 `data/movielens-1m-v2-clean-v1/`
+（可用环境变量 `ML_CLEAN_DIR` 覆盖），文件同样不进 Git，故登记校验和：
+
+| 文件 | 行数 | 字节 | SHA256 |
+| --- | ---: | ---: | --- |
+| `ratings.dat` | 996,113 | 24,501,943 | `82be75a4cf84249e2f4747cc720078c410730e2461b916fdf1c1380667bfa0fd` |
+| `movies.dat` | 3,883 | 171,416 | `7ffe7c6a59340a131b42b2aabaf057bdf6078dec4950b070d549129486d91daa` |
+| `users.dat` | 6,025 | 133,687 | `9497271cb958f70ceacf7d32dee1f0a019457aaa2484302e6d2083ad50c14b23` |
+
+- 生成方式：迭代一 `hadoop/output/clean/` 实跑产物，本仓库不重复执行清洗；
+- 切分与标签分布见 `reports/experiments/split-v1.json` 与 `docs/迭代二/交付/数据就绪检查.md`；
+- 已知遗留：4,328 个主键冲突无法判定真值；2,994 条评分涉及的 15 个 UserID 在
+  `users.dat` 中无属性；测试期比 70/15/15 的理论规模少 4,096 条（均为测试期冲突整组隔离）。
+
 ## v2 相对 v1 的差异（实测）
 
 v2 = 官方 v1 全量记录 + 注入记录，注入内容按表统计如下（明细见 `reports/quality-report/quality-report.md`）：
@@ -61,6 +77,12 @@ sha256sum data/ml-1m-v2/*.dat
 cd ~/movielens-data-agent
 python3 hadoop/src/driver.py --mode hadoop --stage all \
   --task-id task_002 --data-dir data/ml-1m-v2
+
+# 4) 迭代二输入：把清洗产物放到 data/movielens-1m-v2-clean-v1/（不进 Git）
+mkdir -p data/movielens-1m-v2-clean-v1
+cp hadoop/output/clean/*.dat data/movielens-1m-v2-clean-v1/
+sha256sum data/movielens-1m-v2-clean-v1/*.dat   # 应与本文件 clean 小节一致
+python3 agent/tools/common/split.py --out reports/experiments/split-v1.json
 ```
 
 ## 注意

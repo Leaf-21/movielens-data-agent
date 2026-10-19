@@ -1,0 +1,65 @@
+{
+  "train": {
+    "records": 700148,
+    "ratio": 0.70288,
+    "positives": 407879,
+    "positive_rate": 0.582561,
+    "users": 4870,
+    "movies": 3633,
+    "time_min": 956703932,
+    "time_max": 974862386
+  },
+  "validate": {
+    "records": 150031,
+    "ratio": 0.150616,
+    "positives": 84250,
+    "positive_rate": 0.561551,
+    "users": 1352,
+    "movies": 3426,
+    "time_min": 974862390,
+    "time_max": 976422054
+  },
+  "test": {
+    "records": 145934,
+    "ratio": 0.146503,
+    "positives": 80876,
+    "positive_rate": 0.554196,
+    "users": 1482,
+    "movies": 3482,
+    "time_min": 976422083,
+    "time_max": 1046454590
+  },
+  "_meta": {
+    "records": 996113,
+    "invalid_rows": 0,
+    "time_min": 956703932,
+    "time_max": 1046454590,
+    "T1_epoch": 974862386,
+    "T2_epoch": 976422054,
+    "split_rule": "train: ts <= T1; validate: T1 < ts <= T2; test: ts > T2",
+    "duplicate_pairs": 0,
+    "split_version": "split-v1",
+    "data_version": "movielens-1m-v2-clean-v1",
+    "cleaning_rule_version": "rule-v2"
+  },
+  "source": {
+    "dir": "data/movielens-1m-v2-clean-v1",
+    "files": {
+      "ratings.dat": {
+        "lines": 996113,
+        "bytes": 24501943,
+        "sha256": "82be75a4cf84249e2f4747cc720078c410730e2461b916fdf1c1380667bfa0fd"
+      },
+      "movies.dat": {
+        "lines": 3883,
+        "bytes": 171416,
+        "sha256": "7ffe7c6a59340a131b42b2aabaf057bdf6078dec4950b070d549129486d91daa"
+      },
+      "users.dat": {
+        "lines": 6025,
+        "bytes": 133687,
+        "sha256": "9497271cb958f70ceacf7d32dee1f0a019457aaa2484302e6d2083ad50c14b23"
+      }
+    }
+  }
+}
