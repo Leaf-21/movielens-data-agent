@@ -1,0 +1,31 @@
+[
+  {
+    "algorithm": "Gaussian Naive Bayes",
+    "slug": "gnb",
+    "valid_roc_auc": 0.68383,
+    "valid_pr_auc": 0.705888,
+    "test_roc_auc": 0.683838,
+    "test_pr_auc": 0.694191,
+    "test_f1": 0.713555,
+    "test_accuracy": 0.656036,
+    "threshold": 0.42051,
+    "parameters": {
+      "var_smoothing": 1e-09
+    }
+  },
+  {
+    "algorithm": "Decision Tree (entropy / ID3-C4.5 style split)",
+    "slug": "cart",
+    "valid_roc_auc": 0.776822,
+    "valid_pr_auc": 0.79675,
+    "test_roc_auc": 0.771001,
+    "test_pr_auc": 0.787154,
+    "test_f1": 0.752691,
+    "test_accuracy": 0.70843,
+    "threshold": 0.49627,
+    "parameters": {
+      "max_depth": 12,
+      "min_samples_leaf": 100
+    }
+  }
+]

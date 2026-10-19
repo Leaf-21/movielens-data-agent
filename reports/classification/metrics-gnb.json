@@ -1,0 +1,118 @@
+{
+  "algorithm": "Gaussian Naive Bayes",
+  "algorithm_slug": "gnb",
+  "model_version": "gnb-20261019",
+  "validation": {
+    "n": 150031,
+    "positive_rate": 0.561551,
+    "roc_auc": 0.68383,
+    "pr_auc": 0.705888,
+    "threshold": 0.42051,
+    "accuracy": 0.657877,
+    "precision": 0.677619,
+    "recall": 0.745365,
+    "f1": 0.709879,
+    "predicted_positive_rate": 0.617692,
+    "confusion_matrix": {
+      "tn": 35905,
+      "fp": 29876,
+      "fn": 21453,
+      "tp": 62797
+    }
+  },
+  "test": {
+    "n": 145934,
+    "positive_rate": 0.554196,
+    "roc_auc": 0.683838,
+    "pr_auc": 0.694191,
+    "threshold": 0.42051,
+    "accuracy": 0.656036,
+    "precision": 0.662565,
+    "recall": 0.773048,
+    "f1": 0.713555,
+    "predicted_positive_rate": 0.646607,
+    "confusion_matrix": {
+      "tn": 33217,
+      "fp": 31841,
+      "fn": 18355,
+      "tp": 62521
+    }
+  },
+  "test_threshold_0.5": {
+    "n": 145934,
+    "positive_rate": 0.554196,
+    "roc_auc": 0.683838,
+    "pr_auc": 0.694191,
+    "threshold": 0.5,
+    "accuracy": 0.657146,
+    "precision": 0.675826,
+    "recall": 0.7329,
+    "f1": 0.703207,
+    "predicted_positive_rate": 0.600998,
+    "confusion_matrix": {
+      "tn": 36626,
+      "fp": 28432,
+      "fn": 21602,
+      "tp": 59274
+    }
+  },
+  "test_strata": {
+    "user_seen_in_train": {
+      "n": 76027,
+      "positive_rate": 0.532324,
+      "precision": 0.647197,
+      "recall": 0.767982,
+      "f1": 0.702435,
+      "roc_auc": 0.689271,
+      "pr_auc": 0.685074
+    },
+    "user_unseen_in_train": {
+      "n": 69907,
+      "positive_rate": 0.577982,
+      "precision": 0.678493,
+      "recall": 0.778122,
+      "f1": 0.7249,
+      "roc_auc": 0.676017,
+      "pr_auc": 0.703088
+    },
+    "movie_seen_in_train": {
+      "n": 145807,
+      "positive_rate": 0.55426,
+      "precision": 0.662606,
+      "recall": 0.773309,
+      "f1": 0.71369,
+      "roc_auc": 0.68387,
+      "pr_auc": 0.69424
+    },
+    "movie_unseen_in_train": {
+      "n": 127,
+      "positive_rate": 0.480315,
+      "precision": 0.577778,
+      "recall": 0.42623,
+      "f1": 0.490566,
+      "roc_auc": 0.617238,
+      "pr_auc": 0.60091
+    }
+  },
+  "selection": [
+    {
+      "parameters": {
+        "var_smoothing": 1e-09
+      },
+      "valid_roc_auc": 0.68383,
+      "valid_pr_auc": 0.705888,
+      "valid_f1_at_selected_threshold": 0.709879,
+      "valid_predicted_positive_rate": 0.617692
+    },
+    {
+      "parameters": {
+        "var_smoothing": 1e-09
+      },
+      "valid_roc_auc": 0.68383,
+      "valid_pr_auc": 0.705888,
+      "valid_f1_at_selected_threshold": 0.709879,
+      "valid_predicted_positive_rate": 0.617692
+    }
+  ],
+  "threshold_selected_on": "validation"
+}

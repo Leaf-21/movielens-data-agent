@@ -1,0 +1,45 @@
+{
+  "models": {
+    "gnb": {
+      "model_version": "gnb-20261019",
+      "algorithm": "Gaussian Naive Bayes",
+      "parameters": {
+        "var_smoothing": 1e-09
+      },
+      "data_version": "movielens-1m-v2-clean-v1",
+      "cleaning_rule_version": "rule-v2",
+      "feature_version": "feat-v1",
+      "split_version": "split-v1",
+      "T1": 974862386,
+      "T2": 976422054,
+      "code_commit": "f1f4ec1",
+      "trained_at": "2026-10-19T11:25:09",
+      "threshold": 0.42051,
+      "model_path": "artifacts/classification/gnb/gnb-20261019/model.pkl",
+      "model_sha256": "fb7fd56ad9696fa1442fd0f6692d1a4c20a243b33dd99b60e5232006a994c8b2",
+      "valid_roc_auc": 0.68383,
+      "test_roc_auc": 0.683838
+    },
+    "cart": {
+      "model_version": "cart-20261019",
+      "algorithm": "Decision Tree (entropy / ID3-C4.5 style split)",
+      "parameters": {
+        "max_depth": 12,
+        "min_samples_leaf": 100
+      },
+      "data_version": "movielens-1m-v2-clean-v1",
+      "cleaning_rule_version": "rule-v2",
+      "feature_version": "feat-v1",
+      "split_version": "split-v1",
+      "T1": 974862386,
+      "T2": 976422054,
+      "code_commit": "f1f4ec1",
+      "trained_at": "2026-10-19T11:25:31",
+      "threshold": 0.49627,
+      "model_path": "artifacts/classification/cart/cart-20261019/model.pkl",
+      "model_sha256": "d52fecde55b58b69d4aa656da739126067297142a6d4b6176f818e5e9132dfc4",
+      "valid_roc_auc": 0.776822,
+      "test_roc_auc": 0.771001
+    }
+  }
+}

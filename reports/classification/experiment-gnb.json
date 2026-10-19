@@ -1,0 +1,38 @@
+{
+  "experiment_id": "cls-gnb-20261019",
+  "task_type": "classification",
+  "data_version": "movielens-1m-v2-clean-v1",
+  "cleaning_rule_version": "rule-v2",
+  "T1": 974862386,
+  "T2": 976422054,
+  "split_version": "split-v1",
+  "feature_or_profile_version": "feat-v1",
+  "algorithm": "Gaussian Naive Bayes",
+  "algorithm_source": "26Fall-008-分类1010+1014.pdf 第 25–36 页（NB）/ 第 37–61 页（DT）",
+  "parameters": {
+    "var_smoothing": 1e-09
+  },
+  "code_commit": "f1f4ec1",
+  "metrics": {
+    "validation": {
+      "roc_auc": 0.68383,
+      "pr_auc": 0.705888,
+      "f1": 0.709879,
+      "threshold": 0.42051
+    },
+    "test": {
+      "roc_auc": 0.683838,
+      "pr_auc": 0.694191,
+      "f1": 0.713555,
+      "threshold": 0.42051
+    }
+  },
+  "artifact_paths": [
+    "artifacts/classification/gnb/gnb-20261019/model.pkl"
+  ],
+  "limitations": [
+    "用户级冷启动比例高，分层指标优先于总体指标",
+    "概率未校准，不能当作真实概率展示",
+    "标签含 4,328 个冲突键带来的噪声"
+  ]
+}
