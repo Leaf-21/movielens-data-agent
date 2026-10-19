@@ -1,0 +1,276 @@
+{
+  "_note": "真实运行输出（非构造/占位）。同一清洗快照、同一模型与阈值，由 classification_tool 的 --request/--output 协议产生。",
+  "_purpose": "供成员C按真实字段渲染分类结果；两个样例分别覆盖“有历史”与“历史不足回退”两种展示路径。",
+  "_commands": [
+    "python3 -I agent/tools/classification/classification_tool.py --algorithm cart --user-id 4169 --movie-id 260 --output s1.json",
+    "python3 -I agent/tools/classification/classification_tool.py --algorithm gnb --user-id 1 --movie-id 1193 --output s2.json"
+  ],
+  "_data_version": "movielens-1m-v2-clean-v1",
+  "_feature_version": "feat-v1",
+  "_samples": [
+    {
+      "case": "有历史：用户 4169 此前 1440 条、电影 260 此前 2239 条",
+      "envelope": {
+        "task_type": "classification",
+        "status": "SUCCESS",
+        "algorithm": "cart",
+        "algorithm_name": "Decision Tree (entropy / ID3-C4.5 style split)",
+        "algorithm_tool": "classification_cart",
+        "algorithm_source": "课程课件 26Fall-008-分类1010+1014.pdf 第 38–61 页（决策树，信息增益）",
+        "model_version": "cart-20261019",
+        "result_version": "cls-0c388dfb5da5",
+        "parameters": {
+          "max_depth": 12,
+          "min_samples_leaf": 100
+        },
+        "data_version": "movielens-1m-v2-clean-v1",
+        "cleaning_rule_version": "rule-v2",
+        "feature_version": "feat-v1",
+        "split_version": "split-v1",
+        "T1": 974862386,
+        "T2": 976422054,
+        "code_version": "b0e803e",
+        "created_at": "2026-10-19T13:14:07",
+        "target": {
+          "user_id": 4169,
+          "movie_id": 260
+        },
+        "prediction_time_basis": "train_snapshot(T1=974862386)",
+        "results": [
+          {
+            "algorithm": "Decision Tree (entropy / ID3-C4.5 style split)",
+            "algorithm_slug": "cart",
+            "model_version": "cart-20261019",
+            "predicted_class": "HIGH_RATING",
+            "positive_probability": 0.903182,
+            "decision_score": 0.903182,
+            "score_type": "positive_probability",
+            "parameters": {
+              "max_depth": 12,
+              "min_samples_leaf": 100
+            },
+            "metrics": {
+              "threshold": 0.49627,
+              "valid_roc_auc": 0.776822,
+              "valid_pr_auc": 0.79675,
+              "test_roc_auc": 0.771001,
+              "test_pr_auc": 0.787154
+            },
+            "limitations": [
+              "概率未经校准，不能当作真实概率直接展示；决策阈值在验证期选定。",
+              "用户或电影在训练期历史不足时，相关特征回退到训练期全局均分，预测可信度下降。",
+              "模型只使用 T1 之前的数据训练，不反映 T1 之后的偏好变化。"
+            ],
+            "features_used": {
+              "user_mean": 3.7875,
+              "user_history_count": 1440,
+              "user_mean_source": "history",
+              "movie_mean": 4.4623,
+              "movie_history_count": 2239,
+              "movie_mean_source": "history",
+              "genres": [
+                "Action",
+                "Adventure",
+                "Fantasy",
+                "Sci-Fi"
+              ],
+              "occupation": 0,
+              "age": 50,
+              "has_user_attrs": true
+            },
+            "explain": [
+              {
+                "node": 0,
+                "feature_index": 1,
+                "threshold": 3.603283,
+                "value": 4.46226,
+                "direction": "right"
+              },
+              {
+                "node": 1750,
+                "feature_index": 0,
+                "threshold": 3.6821,
+                "value": 3.7875,
+                "direction": "right"
+              },
+              {
+                "node": 2548,
+                "feature_index": 1,
+                "threshold": 4.028861,
+                "value": 4.46226,
+                "direction": "right"
+              },
+              {
+                "node": 3038,
+                "feature_index": 0,
+                "threshold": 4.004124,
+                "value": 3.7875,
+                "direction": "left"
+              },
+              {
+                "node": 3039,
+                "feature_index": 1,
+                "threshold": 4.213638,
+                "value": 4.46226,
+                "direction": "right"
+              },
+              {
+                "node": 3163,
+                "feature_index": 2,
+                "threshold": 3.113268,
+                "value": 7.714231,
+                "direction": "right"
+              },
+              {
+                "node": 3187,
+                "feature_index": 1,
+                "threshold": 4.403304,
+                "value": 4.46226,
+                "direction": "right"
+              },
+              {
+                "node": 3231,
+                "feature_index": 37,
+                "threshold": 0.5,
+                "value": 0.0,
+                "direction": "left"
+              },
+              {
+                "node": 3232,
+                "feature_index": 12,
+                "threshold": 0.5,
+                "value": 0.0,
+                "direction": "left"
+              },
+              {
+                "node": 3233,
+                "feature_index": 31,
+                "threshold": 0.5,
+                "value": 0.0,
+                "direction": "left"
+              },
+              {
+                "node": 3234,
+                "feature_index": 2,
+                "threshold": 3.860674,
+                "value": 7.714231,
+                "direction": "right"
+              },
+              {
+                "node": 3238,
+                "feature_index": 43,
+                "threshold": 2.5,
+                "value": 5.0,
+                "direction": "right"
+              },
+              {
+                "node": 3240,
+                "leaf_samples": 2200,
+                "leaf_positive_rate": 0.000411
+              }
+            ],
+            "prediction_time_basis": "train_snapshot(T1=974862386)"
+          }
+        ],
+        "metrics": {
+          "threshold": 0.49627,
+          "valid_roc_auc": 0.776822,
+          "valid_pr_auc": 0.79675,
+          "test_roc_auc": 0.771001,
+          "test_pr_auc": 0.787154
+        },
+        "limitations": [
+          "概率未经校准，不能当作真实概率直接展示；决策阈值在验证期选定。",
+          "用户或电影在训练期历史不足时，相关特征回退到训练期全局均分，预测可信度下降。",
+          "模型只使用 T1 之前的数据训练，不反映 T1 之后的偏好变化。"
+        ],
+        "elapsed_ms": 8903
+      }
+    },
+    {
+      "case": "历史不足：用户 1 训练期无评分，用户特征走 fallback_global_mean",
+      "envelope": {
+        "task_type": "classification",
+        "status": "SUCCESS",
+        "algorithm": "gnb",
+        "algorithm_name": "Gaussian Naive Bayes",
+        "algorithm_tool": "classification_gnb",
+        "algorithm_source": "课程课件 26Fall-008-分类1010+1014.pdf 第 25–36 页（朴素贝叶斯）",
+        "model_version": "gnb-20261019",
+        "result_version": "cls-e4bc69a2d279",
+        "parameters": {
+          "var_smoothing": 1e-09
+        },
+        "data_version": "movielens-1m-v2-clean-v1",
+        "cleaning_rule_version": "rule-v2",
+        "feature_version": "feat-v1",
+        "split_version": "split-v1",
+        "T1": 974862386,
+        "T2": 976422054,
+        "code_version": "b0e803e",
+        "created_at": "2026-10-19T13:14:09",
+        "target": {
+          "user_id": 1,
+          "movie_id": 1193
+        },
+        "prediction_time_basis": "train_snapshot(T1=974862386)",
+        "results": [
+          {
+            "algorithm": "Gaussian Naive Bayes",
+            "algorithm_slug": "gnb",
+            "model_version": "gnb-20261019",
+            "predicted_class": "HIGH_RATING",
+            "positive_probability": 0.82865,
+            "decision_score": 0.82865,
+            "score_type": "positive_probability",
+            "parameters": {
+              "var_smoothing": 1e-09
+            },
+            "metrics": {
+              "threshold": 0.42051,
+              "valid_roc_auc": 0.68383,
+              "valid_pr_auc": 0.705888,
+              "test_roc_auc": 0.683838,
+              "test_pr_auc": 0.694191
+            },
+            "limitations": [
+              "概率未经校准，不能当作真实概率直接展示；决策阈值在验证期选定。",
+              "用户或电影在训练期历史不足时，相关特征回退到训练期全局均分，预测可信度下降。",
+              "模型只使用 T1 之前的数据训练，不反映 T1 之后的偏好变化。",
+              "用户或电影历史不足，相关特征使用训练期全局均分回退"
+            ],
+            "features_used": {
+              "user_mean": 3.6019,
+              "user_history_count": 0,
+              "user_mean_source": "fallback_global_mean",
+              "movie_mean": 4.4116,
+              "movie_history_count": 1278,
+              "movie_mean_source": "history",
+              "genres": [
+                "Drama"
+              ],
+              "occupation": 10,
+              "age": 1,
+              "has_user_attrs": true
+            },
+            "prediction_time_basis": "train_snapshot(T1=974862386)"
+          }
+        ],
+        "metrics": {
+          "threshold": 0.42051,
+          "valid_roc_auc": 0.68383,
+          "valid_pr_auc": 0.705888,
+          "test_roc_auc": 0.683838,
+          "test_pr_auc": 0.694191
+        },
+        "limitations": [
+          "概率未经校准，不能当作真实概率直接展示；决策阈值在验证期选定。",
+          "用户或电影在训练期历史不足时，相关特征回退到训练期全局均分，预测可信度下降。",
+          "模型只使用 T1 之前的数据训练，不反映 T1 之后的偏好变化。",
+          "用户或电影历史不足，相关特征使用训练期全局均分回退"
+        ],
+        "elapsed_ms": 1788
+      }
+    }
+  ]
+}
