@@ -71,6 +71,11 @@ const AgentApi = (function () {
       return request('POST', '/api/tasks', payload);
     },
 
+    createAnalysisTask(category, payload) {
+      return request('POST', '/api/analysis/' + encodeURIComponent(category) + '/tasks',
+                     payload);
+    },
+
     // 查询任务状态（接口规范第 6 节）
     getStatus(taskId) {
       return request('GET', '/api/tasks/' + encodeURIComponent(taskId));

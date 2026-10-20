@@ -34,24 +34,30 @@ class TestRegistry(unittest.TestCase):
                          ['dbscan', 'kmeans'])
         self.assertEqual(registry.algorithm_names('classification'), [])
         self.assertEqual(registry.algorithm_names('dimensionality_reduction'),
-                         [])
+                         ['pca', 'tsne'])
 
     def test_tool_naming_convention(self):
         self.assertEqual(registry.tool_name('clustering', 'kmeans'),
                          'clustering_kmeans')
         self.assertEqual(registry.implemented_tools(),
-                         ['clustering_dbscan', 'clustering_kmeans'])
+                         ['clustering_dbscan', 'clustering_kmeans',
+                          'dimensionality_reduction_pca',
+                          'dimensionality_reduction_tsne'])
 
     def test_require_registered(self):
         entry = registry.require('clustering', 'kmeans')
         self.assertEqual(entry['module'], 'clustering.kmeans_tool')
         self.assertTrue(os.path.exists(registry.module_file(entry)))
+        for cat, algo in (('dimensionality_reduction', 'pca'),
+                          ('dimensionality_reduction', 'tsne')):
+            e = registry.require(cat, algo)
+            self.assertTrue(os.path.exists(registry.module_file(e)))
 
     def test_require_unregistered_model_not_found(self):
-        for cat, algo in (('clustering', ' pca'), ('classification', 'xgboost'),
-                          ('dimensionality_reduction', 'pca')):
+        for cat, algo in (('clustering', 'pca'), ('classification', 'xgboost'),
+                          ('dimensionality_reduction', 'umap')):
             with self.assertRaises(AnalysisError) as cm:
-                registry.require(cat, algo.strip())
+                registry.require(cat, algo)
             self.assertEqual(cm.exception.code, 'MODEL_NOT_FOUND')
 
     def test_category_slugs(self):
@@ -71,6 +77,15 @@ class TestRouter(unittest.TestCase):
         self.assertIn('对照', plan['notes'])
         self.assertEqual(plan['data_version'], 'movielens-1m-v2-clean-v1')
         self.assertEqual(plan['profile_version'], 'profile-v1')
+
+    def test_dimensionality_reduction_defaults_to_registered_population(self):
+        plan = self._route('dimensionality-reduction', {
+            'query': '对用户画像进行降维'
+        })
+        self.assertEqual(plan['task_type'], 'dimensionality_reduction')
+        self.assertIsNone(plan['user_ids'])
+        self.assertEqual(plan['algorithms'], ['pca', 'tsne'])
+        self.assertIn('已登记的拟合画像用户', plan['notes'])
 
     def test_query_algorithm_keywords(self):
         self.assertEqual(

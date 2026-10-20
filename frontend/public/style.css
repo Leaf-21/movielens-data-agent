@@ -123,6 +123,16 @@ label.field input {
   min-width: 180px;
 }
 
+label.field select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  min-width: 180px;
+}
+
 button.primary {
   background: var(--accent);
   color: #04283a;
@@ -353,6 +363,22 @@ details.unresolved summary { cursor: pointer; color: var(--warn); font-size: 13p
 }
 .sample-table th { background: var(--panel-2); color: var(--muted); }
 .sample-table td.mono { font-family: Consolas, monospace; }
+
+.analysis-entry { border-top: 1px solid var(--border); margin-top: 18px; padding-top: 14px; }
+.analysis-entry h3 { margin: 0 0 10px; color: var(--accent-2); font-size: 15px; }
+.analysis-entry h4 { margin: 18px 0 8px; font-size: 13px; }
+.analysis-entry-meta { margin: 0; }
+.analysis-entry .sub { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.comparison-block { margin-top: 14px; }
+.comparison-block > .sub { margin-left: 10px; }
+.scatter-legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.scatter-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.fit-dot, .projected-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.fit-dot { background: var(--accent); }
+.projected-dot { background: var(--warn); }
+.scatter-plot { width: 100%; max-height: 400px; margin-top: 8px; background: #0b1220; border-radius: 8px; }
+.scatter-plot line { stroke: var(--border); stroke-width: 1; }
+.scatter-plot text { fill: var(--muted); font-size: 10px; }
 
 footer {
   text-align: center;

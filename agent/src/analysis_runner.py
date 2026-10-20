@@ -41,10 +41,22 @@ from common import AnalysisError   # noqa: E402
 RUNTIME_ANALYSIS_DIR = os.path.join(config.AGENT_DIR, 'runtime', 'analysis')
 
 # 工具信封必需键（缺任何一个都视为工具违约 -> ALGORITHM_ERROR，不入库假结果）
-REQUIRED_ENV_KEYS = ('algorithm', 'algorithm_tool', 'model_version', 'result_version',
-                     'parameters', 'data_version', 'profile_version', 'T1', 'T2',
-                     'code_version', 'created_at', 'metrics', 'assignments',
-                     'cluster_summaries', 'limitations')
+COMMON_ENV_KEYS = ('algorithm', 'algorithm_tool', 'model_version', 'result_version',
+                   'parameters', 'data_version', 'profile_version', 'T1', 'T2',
+                   'code_version', 'created_at', 'limitations')
+CATEGORY_ENV_KEYS = {
+    'clustering': ('metrics', 'assignments', 'cluster_summaries'),
+    'classification': ('metrics', 'results'),
+    'dimensionality_reduction': (
+        'original_dimensions', 'reduced_dimensions', 'information_retention',
+        'resource_usage', 'coordinates', 'clustering_comparison',
+    ),
+}
+REQUIRED_ENV_KEYS = COMMON_ENV_KEYS + CATEGORY_ENV_KEYS['clustering']
+
+
+def required_env_keys(category):
+    return COMMON_ENV_KEYS + CATEGORY_ENV_KEYS.get(category, ())
 
 
 def _task_workdir(task_id):
@@ -53,7 +65,8 @@ def _task_workdir(task_id):
     return d
 
 
-def _run_tool_subprocess(entry, algo, task_id, payload, log_lines):
+def _run_tool_subprocess(entry, algo, task_id, payload, log_lines,
+                         category='clustering'):
     """子进程执行一个工具，含崩溃/超时重试一次。返回信封 dict。"""
     tool_file = registry.module_file(entry)
     if not os.path.exists(tool_file):
@@ -90,7 +103,7 @@ def _run_tool_subprocess(entry, algo, task_id, payload, log_lines):
             except ValueError as e:
                 last = ('输出信封不可解析: %s' % e, proc.returncode, stderr)
                 continue
-            missing = [k for k in REQUIRED_ENV_KEYS if k not in env]
+            missing = [k for k in required_env_keys(category) if k not in env]
             if missing:
                 raise AnalysisError('ALGORITHM_ERROR',
                                     '工具信封缺少必需字段: %s（工具违约，拒收）' % missing,
@@ -181,8 +194,10 @@ def run_task(store, task_id, results_dir):
                 'data_version': plan['data_version'],
                 'profile_version': plan['profile_version'],
             }
+            if category == 'classification':
+                payload.update(plan['classification_target'])
             results.append(_run_tool_subprocess(entry, algo, task_id, payload,
-                                                log_lines))
+                                                log_lines, category=category))
 
         # ---- 装配任务级结果（规范 §4.2：Agent 透传，不改写算法数值）----
         stage = models.GENERATE_REPORT

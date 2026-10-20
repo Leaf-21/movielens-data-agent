@@ -30,10 +30,11 @@ import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _TOOLS_DIR = os.path.dirname(_HERE)                      # agent/tools
 _SRC_DIR = os.path.join(os.path.dirname(_TOOLS_DIR), 'src')  # agent/src
-# _HERE 必须显式入径：python3 -I（子进程隔离模式）不会把脚本目录加进 sys.path
-for _p in (_HERE, _SRC_DIR, _TOOLS_DIR):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+# _HERE 必须优先：agent/tools/common 是数据包，不提供聚类侧 AnalysisError。
+for _p in (_TOOLS_DIR, _SRC_DIR, _HERE):
+    if _p in sys.path:
+        sys.path.remove(_p)
+    sys.path.insert(0, _p)
 
 import config                                  # noqa: E402
 from common import AnalysisError, sha256_file, code_version, now_utc  # noqa: E402
@@ -356,7 +357,11 @@ def main():
                        'n_insufficient_history', 'n_no_train_history',
                        'input_sha256', 'code_version', 'created_at')},
                      ensure_ascii=False, indent=2))
-    print('->', os.path.relpath(path, config.REPO_DIR))
+    try:
+        display_path = os.path.relpath(path, config.REPO_DIR)
+    except ValueError:
+        display_path = path
+    print('->', display_path)
     return 0
 
 

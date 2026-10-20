@@ -22,6 +22,8 @@ const Render = (function () {
 
   const STAGES = [
     { key: 'PARSE_REQUEST', cn: '解析需求' },
+    { key: 'PROFILE_BUILD', cn: '构建用户画像' },
+    { key: 'CLUSTER_FIT', cn: '运行分析算法' },
     { key: 'BEFORE_SCORE', cn: '清洗前评分' },
     { key: 'CLEANING', cn: '数据清洗' },
     { key: 'AFTER_SCORE', cn: '清洗后评分' },
@@ -78,6 +80,7 @@ const Render = (function () {
     const meta = $('#metaGrid');
     const items = [
       ['任务 ID', raw(resp.task_id)],
+      ['任务类型', raw(resp.task_type)],
       ['状态', STATUS_CN[resp.status] || raw(resp.status)],
       ['当前阶段', cur ? (STAGES.find(s => s.key === cur) || {}).cn || cur : '—']
     ];
@@ -294,5 +297,177 @@ const Render = (function () {
     box.innerHTML = '<p style="color:var(--muted);font-size:13px">样例数据格式未识别。</p>';
   }
 
-  return { status, scores, versions, statistics, problems, report, sample, DIMS };
+  function display(value) {
+    if (value === null || value === undefined || value === '') return '—';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  function analysis(result) {
+    const meta = [
+      ['任务类型', result.task_type],
+      ['数据版本', result.data_version],
+      ['画像版本', result.profile_version],
+      ['T1', result.T1],
+      ['T2', result.T2],
+      ['任务状态', result.status]
+    ];
+    $('#analysisMeta').innerHTML = meta.map(([k, v]) =>
+      `<div class="meta-item"><div class="k">${esc(k)}</div><div class="v">${esc(display(v))}</div></div>`
+    ).join('');
+
+    const entries = Array.isArray(result.results) ? result.results : [];
+    if (!entries.length) {
+      $('#analysisResults').innerHTML =
+        '<p class="sub">任务没有返回已完成的算法结果；请检查任务状态和失败原因。</p>';
+      return;
+    }
+    $('#analysisResults').innerHTML = entries.map((entry, index) =>
+      analysisEntry(entry, index, result.task_type)
+    ).join('');
+  }
+
+  function analysisEntry(entry, index, taskType) {
+    let html = `<article class="analysis-entry">
+      <h3>${esc(entry.algorithm_name || entry.algorithm_tool || entry.algorithm || `算法 ${index + 1}`)}</h3>
+      <div class="meta-grid analysis-entry-meta">
+        <div class="meta-item"><div class="k">算法工具</div><div class="v">${esc(display(entry.algorithm_tool))}</div></div>
+        <div class="meta-item"><div class="k">模型版本</div><div class="v">${esc(display(entry.model_version))}</div></div>
+        <div class="meta-item"><div class="k">结果版本</div><div class="v">${esc(display(entry.result_version))}</div></div>
+        <div class="meta-item"><div class="k">算法参数</div><div class="v">${esc(display(entry.parameters))}</div></div>
+      </div>`;
+
+    if (taskType === 'dimensionality_reduction') {
+      html += renderDimensionalityReduction(entry);
+    } else if (taskType === 'clustering') {
+      html += renderClustering(entry);
+    } else if (taskType === 'classification') {
+      html += renderClassification(entry);
+    }
+    html += renderLimitations(entry.limitations);
+    html += '</article>';
+    return html;
+  }
+
+  function renderDimensionalityReduction(entry) {
+    const info = entry.information_retention || {};
+    const usage = entry.resource_usage || {};
+    const retention = [
+      ['指标', info.metric],
+      ['信息保留值', info.top2_cumulative !== undefined
+        ? info.top2_cumulative : info.knn_agreement],
+      ['指标定义', info.definition],
+      ['原始维数', entry.original_dimensions],
+      ['降维维数', entry.reduced_dimensions],
+      ['运行时间 (ms)', usage.elapsed_ms],
+      ['峰值 Python 分配 (bytes)', usage.peak_alloc_bytes],
+      ['内存测量方法', usage.memory_method]
+    ];
+    let html = `<h4>降维与资源指标</h4><div class="meta-grid">${retention.map(([k, v]) =>
+      `<div class="meta-item"><div class="k">${esc(k)}</div><div class="v">${esc(display(v))}</div></div>`
+    ).join('')}</div>`;
+    html += renderScatter(entry);
+    html += renderClusteringComparison(entry.clustering_comparison);
+    return html;
+  }
+
+  function renderScatter(entry) {
+    const coords = (entry.coordinates || []).filter(c =>
+      typeof c.x === 'number' && Number.isFinite(c.x) &&
+      typeof c.y === 'number' && Number.isFinite(c.y));
+    if (!coords.length) {
+      return '<h4>二维坐标</h4><p class="sub">当前没有可绘制的有效坐标。</p>';
+    }
+    const width = 620, height = 340, pad = 36;
+    const xs = coords.map(c => c.x), ys = coords.map(c => c.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const xScale = x => pad + (maxX === minX ? 0.5 : (x - minX) / (maxX - minX))
+      * (width - 2 * pad);
+    const yScale = y => height - pad - (maxY === minY ? 0.5 : (y - minY) / (maxY - minY))
+      * (height - 2 * pad);
+    const points = coords.map(c => {
+      const fit = c.is_fit_user !== false;
+      const color = fit ? '#38bdf8' : '#fbbf24';
+      return `<circle cx="${xScale(c.x).toFixed(2)}" cy="${yScale(c.y).toFixed(2)}"
+        r="4.5" fill="${color}"><title>${esc(`用户 ${c.user_id} · ${c.status}`)}</title></circle>`;
+    }).join('');
+    const axis = entry.axis_meaning || {};
+    return `<h4>二维坐标可视化</h4>
+      <div class="scatter-legend"><span><i class="fit-dot"></i>拟合用户</span>
+      <span><i class="projected-dot"></i>样本外投影</span>
+      <span>有效坐标 ${coords.length} / ${esc(display((entry.coordinates || []).length))}</span></div>
+      <svg class="scatter-plot" viewBox="0 0 ${width} ${height}" role="img"
+        aria-label="${esc(`${axis.x || 'x'} / ${axis.y || 'y'} 降维散点图`)}">
+        <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" />
+        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${height - pad}" />
+        ${points}
+        <text x="${width / 2}" y="${height - 6}">${esc(axis.x || 'x')}</text>
+        <text x="8" y="${height / 2}" transform="rotate(-90 8 ${height / 2})">${esc(axis.y || 'y')}</text>
+      </svg>`;
+  }
+
+  function renderClusteringComparison(comparison) {
+    if (!comparison || typeof comparison !== 'object') {
+      return '<h4>降维前后聚类对照</h4><p class="sub">接口未返回聚类对照结果。</p>';
+    }
+    return `<h4>降维前后聚类对照</h4>${Object.entries(comparison).map(([name, c]) => {
+      const before = c.before || {};
+      const after = c.after || {};
+      const metricNames = new Set([...Object.keys(before.metrics || {}),
+                                    ...Object.keys(after.metrics || {})]);
+      if (!metricNames.size) {
+        for (const k of ['silhouette', 'davies_bouldin', 'sse', 'n_clusters', 'noise_ratio']) {
+          if (before[k] !== undefined || after[k] !== undefined) metricNames.add(k);
+        }
+      }
+      const rows = [...metricNames].map(k => `<tr><td>${esc(k)}</td>
+        <td>${esc(display((before.metrics || before)[k]))}</td>
+        <td>${esc(display((after.metrics || after)[k]))}</td></tr>`).join('');
+      return `<div class="comparison-block"><b>${esc(c.algorithm || name)}</b>
+        <span class="sub">参数：${esc(display(c.parameters))}</span>
+        <table class="score"><thead><tr><th>指标</th><th>降维前</th><th>降维后</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3">无可用指标</td></tr>'}</tbody></table>
+        <p class="sub">${esc(display(c.comparability_note))}</p></div>`;
+    }).join('')}`;
+  }
+
+  function renderClassification(entry) {
+    const predictions = entry.results || [];
+    const rows = predictions.map(p => `<tr>
+      <td>${esc(display(p.user_id || (entry.target || {}).user_id))}</td>
+      <td>${esc(display(p.movie_id || (entry.target || {}).movie_id))}</td>
+      <td>${esc(display(p.predicted_class))}</td>
+      <td>${esc(display(p.positive_probability))}</td>
+      <td>${esc(display(p.decision_score))}</td>
+    </tr>`).join('');
+    return `<h4>分类预测</h4><table class="score"><thead><tr>
+      <th>用户</th><th>电影</th><th>预测类别</th><th>正类概率</th><th>决策分数</th>
+      </tr></thead><tbody>${rows || '<tr><td colspan="5">接口未返回预测结果</td></tr>'}</tbody></table>
+      <p class="sub">评价指标：${esc(display(entry.metrics))}</p>`;
+  }
+
+  function renderClustering(entry) {
+    const assignments = entry.assignments || [];
+    const rows = assignments.map(a => `<tr>
+      <td>${esc(display(a.user_id))}</td><td>${esc(display(a.cluster_id))}</td>
+      <td>${esc(display(a.is_noise))}</td></tr>`).join('');
+    const summaries = (entry.cluster_summaries || []).map(c =>
+      `<li>群体 ${esc(display(c.cluster_id))}：${esc(display(c.size || c.n_users))} 人；
+      ${esc(display(c.summary || c.preference_summary || c.explanation))}</li>`
+    ).join('');
+    return `<h4>聚类指标</h4><p class="sub">${esc(display(entry.metrics))}</p>
+      <h4>用户群体归属</h4><table class="score"><thead><tr>
+      <th>用户</th><th>群体</th><th>噪声点</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="3">接口未返回用户归属</td></tr>'}</tbody></table>
+      <h4>群体摘要</h4><ul>${summaries || '<li>接口未返回群体摘要。</li>'}</ul>`;
+  }
+
+  function renderLimitations(limitations) {
+    if (!limitations || !limitations.length) return '';
+    return `<h4>结果局限</h4><ul>${limitations.map(item =>
+      `<li>${esc(typeof item === 'object' ? display(item.detail || item.message || item) : item)}</li>`
+    ).join('')}</ul>`;
+  }
+
+  return { status, scores, versions, statistics, problems, report, sample, analysis, DIMS };
 })();

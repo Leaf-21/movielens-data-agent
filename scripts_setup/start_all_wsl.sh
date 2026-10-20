@@ -8,14 +8,31 @@
 # =============================================================================
 set -euo pipefail
 
-export JAVA_HOME="${JAVA_HOME:-$HOME/opt/jdk-17.0.20.1+1}"
+# ---- 解析可用的 JDK：优先已设置的 JAVA_HOME，否则按顺序探测 ----
+if [ -z "${JAVA_HOME:-}" ] || [ ! -d "${JAVA_HOME:-/nonexistent}" ]; then
+  for _jdk in "$HOME/opt/jdk-17.0.20.1+1" "/usr/lib/jvm/java-11-openjdk-amd64" "/usr/lib/jvm/java-1.11.0-openjdk-amd64" "/usr/lib/jvm/openjdk-11"; do
+    if [ -d "$_jdk" ] && [ -x "$_jdk/bin/java" ]; then JAVA_HOME="$_jdk"; break; fi
+  done
+fi
+if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/java" ]; then
+  echo "[x] 找不到可用的 JDK，请安装或设置 JAVA_HOME" >&2
+  exit 1
+fi
+export JAVA_HOME
+
 export HADOOP_HOME="${HADOOP_HOME:-$HOME/opt/hadoop}"
 export HADOOP_CONF_DIR="$HADOOP_HOME/etc/hadoop"
-export PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH"
+export PATH="$JAVA_HOME/bin:$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$PATH"
 export ML_STREAMING_JAR="$HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-3.4.1.jar"
 
-REPO="$HOME/movielens-data-agent"
+# 自动定位仓库根：本脚本位于 <repo>/scripts_setup/ 下
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# 原始数据目录（Hadoop 输入）。默认用仓库内的 data/，若不存在回退到 ~/data/ml-1m-v2
+if [ -d "$REPO/data/ml-1m-v2" ]; then
 DATA_DIR="$REPO/data/ml-1m-v2"
+  else
+  DATA_DIR="${ML_DATA_DIR:-$HOME/data/ml-1m-v2}"
+  fi
 LOGS="$REPO/logs"
 mkdir -p "$LOGS" "$HOME/mlqc-server-work" "$HOME/mlqc-server-out"
 
@@ -64,3 +81,4 @@ done
 echo
 echo "服务已启动。浏览器访问： http://localhost:8000"
 echo "日志目录： $LOGS"
+

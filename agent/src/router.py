@@ -27,13 +27,17 @@ _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 _TOOLS_DIR = os.path.join(os.path.dirname(_SRC_DIR), 'tools')
-for _p in (_TOOLS_DIR, os.path.join(_TOOLS_DIR, 'clustering')):
+for _p in (_TOOLS_DIR, os.path.join(_TOOLS_DIR, 'clustering'),
+           os.path.join(_TOOLS_DIR, 'dimensionality_reduction')):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
 import config  # noqa: E402
 import registry  # noqa: E402
 from clustering.schemas import (validate_parameters, normalize_targets)  # noqa: E402
+# 降维参数白名单校验（成员C）：与 analysis.json allowed_parameters.pca/tsne 同构，
+# 偏离即 INVALID_PARAMETER，绝不静默忽略
+from dr_common import validate_dr_params  # noqa: E402
 from common import (AnalysisError, INVALID_REQUEST,      # noqa: E402
                     VERSION_MISMATCH)
 
@@ -54,6 +58,8 @@ CATEGORY_KEYWORDS = {
 ALGO_KEYWORDS = {
     'clustering': {'kmeans': ['kmeans', 'k-means', 'k 均值', 'k均值'],
                    'dbscan': ['dbscan', '密度聚类', '密度可达']},
+    'dimensionality_reduction': {'pca': ['pca', '主成分'],
+                                 'tsne': ['t-sne', 'tsne', 't 分布']},
 }
 
 _USER_ID_RES = (re.compile(r'用户\s*(\d+)'),
@@ -184,33 +190,53 @@ def route(url_category, payload):
     else:
         user_ids = _extract_user_ids(text)
         if not user_ids:
-            raise AnalysisError(
-                INVALID_REQUEST,
-                '无法确定目标用户：请在 user_id/user_ids 字段给出，或在 query 中写明'
-                '"用户 1000" 之类的 ID；Agent 不会替你挑选用户')
+            if category == 'dimensionality_reduction':
+                user_ids = None
+                notes.append('未指定用户集合，使用已登记的拟合画像用户')
+            else:
+                raise AnalysisError(
+                    INVALID_REQUEST,
+                    '无法确定目标用户：请在 user_id/user_ids 字段给出，或在 query 中写明'
+                    '"用户 1000" 之类的 ID；Agent 不会替你挑选用户')
+
+    classification_target = None
+    if category == 'classification':
+        if not user_ids or len(user_ids) != 1:
+            raise AnalysisError(INVALID_REQUEST,
+                                '分类预测必须且只能指定一个 user_id')
+        try:
+            movie_id = int(str(payload.get('movie_id', '')).strip())
+        except (TypeError, ValueError):
+            raise AnalysisError(INVALID_REQUEST,
+                                '分类预测必须提供正整数 movie_id')
+        if movie_id <= 0:
+            raise AnalysisError(INVALID_REQUEST,
+                                '分类预测必须提供正整数 movie_id')
+        classification_target = {'user_id': user_ids[0], 'movie_id': movie_id}
 
     # ---- 3b) 创建时快速拒绝"全部目标用户未知"（规范 §六，不产生僵尸任务）。
     #      users.dat 可读时做请求级检查；不可读则留给工具执行时如实报错。----
-    try:
-        import build_profile as _bp
-        known_set = _bp.load_users(
-            config.resolve_repo_path(acfg['input']['clean_dir']))
-        if all(u not in known_set for u in user_ids):
-            raise AnalysisError(
-                'UNKNOWN_USER',
-                '目标用户均不存在于 users.dat（清洗快照 %s）' % acfg['input']['data_version'],
-                {'unknown': [str(u) for u in user_ids]})
-        unknown_some = [u for u in user_ids if u not in known_set]
-        if unknown_some:
-            notes.append('用户 %s 不在 users.dat，将按 UNKNOWN_USER 逐用户标注，'
-                         '不给出归属' % unknown_some)
-            user_ids = [u for u in user_ids if u in known_set]
-            if not user_ids:
-                raise AnalysisError('UNKNOWN_USER', '过滤未知用户后无可执行目标')
-    except AnalysisError:
-        raise
-    except Exception:
-        pass  # 快照不可读不在此处判死，执行环节兜底
+    if user_ids is not None:
+        try:
+            import build_profile as _bp
+            known_set = _bp.load_users(
+                config.resolve_repo_path(acfg['input']['clean_dir']))
+            if all(u not in known_set for u in user_ids):
+                raise AnalysisError(
+                    'UNKNOWN_USER',
+                    '目标用户均不存在于 users.dat（清洗快照 %s）' % acfg['input']['data_version'],
+                    {'unknown': [str(u) for u in user_ids]})
+            unknown_some = [u for u in user_ids if u not in known_set]
+            if unknown_some:
+                notes.append('用户 %s 不在 users.dat，将按 UNKNOWN_USER 逐用户标注，'
+                             '不给出归属' % unknown_some)
+                user_ids = [u for u in user_ids if u in known_set]
+                if not user_ids:
+                    raise AnalysisError('UNKNOWN_USER', '过滤未知用户后无可执行目标')
+        except AnalysisError:
+            raise
+        except Exception:
+            pass  # 快照不可读不在此处判死，执行环节兜底
 
     # ---- 4) 参数白名单（按算法裁剪）----
     raw_params = payload.get('parameters') or {}
@@ -228,7 +254,11 @@ def route(url_category, payload):
     for a in algorithms:
         sub = {k: v for k, v in raw_params.items() if k in allowed.get(a, {})}
         dropped = sorted(set(raw_params) - set(sub))
-        params_by_algo[a] = validate_parameters(a, sub, allowed)
+        if category == 'dimensionality_reduction':
+            # 降维参数（target_dimensions/perplexity/...）复用工具内白名单+范围校验
+            params_by_algo[a] = validate_dr_params(sub)
+        else:
+            params_by_algo[a] = validate_parameters(a, sub, allowed)
         if dropped:
             notes.append('参数 %s 对算法 %s 不适用，已忽略' % (dropped, a))
 
@@ -236,12 +266,13 @@ def route(url_category, payload):
         'task_type': category,
         'algorithms': algorithms,
         'user_ids': user_ids,
+        'classification_target': classification_target,
         'parameters_by_algorithm': params_by_algo,
         'data_version': dv,
         'profile_version': pv,
         'notes': '；'.join(notes) if notes else
                  '按 query 与请求字段解析：类别=%s，算法=%s，用户=%d 个'
-                 % (category, algorithms, len(user_ids)),
+                 % (category, algorithms, len(user_ids or [])),
     }
     return plan
 

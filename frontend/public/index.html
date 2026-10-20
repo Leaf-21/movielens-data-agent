@@ -21,12 +21,42 @@
     <h2><span class="idx">1</span>自然语言任务输入</h2>
     <textarea id="prompt" placeholder="请输入清洗与评估需求……"></textarea>
     <div class="row">
+      <label class="field">任务类型
+        <select id="taskType">
+          <option value="cleaning">数据清洗与质量评估</option>
+          <option value="classification">评分分类预测</option>
+          <option value="clustering">用户聚类</option>
+          <option value="dimensionality_reduction">用户画像降维</option>
+        </select>
+      </label>
       <button id="submitBtn" class="primary">开始执行</button>
+    </div>
+    <div id="cleaningFields" class="row">
       <label class="field">数据版本
         <input id="dataVersion" value="movielens-1m-v2" spellcheck="false">
       </label>
       <label class="field">清洗规则版本
         <input id="ruleVersion" value="default" spellcheck="false">
+      </label>
+    </div>
+    <div id="analysisFields" class="row hidden">
+      <label class="field">用户 ID（逗号分隔；降维可留空）
+        <input id="analysisUserIds" placeholder="例如：1000, 2000" spellcheck="false">
+      </label>
+      <label class="field">算法（留空表示按登记算法运行）
+        <input id="analysisAlgorithm" placeholder="例如：pca / tsne / kmeans / dbscan" spellcheck="false">
+      </label>
+      <label class="field">分析数据版本
+        <input id="analysisDataVersion" value="movielens-1m-v2-clean-v1" spellcheck="false">
+      </label>
+      <label class="field">分类电影 ID（分类任务）
+        <input id="analysisMovieId" placeholder="例如：1" spellcheck="false">
+      </label>
+      <label class="field">画像版本
+        <input id="profileVersion" value="profile-v1" spellcheck="false">
+      </label>
+      <label class="field">算法参数 JSON
+        <input id="analysisParameters" placeholder='例如：{"target_dimensions":2}'>
       </label>
     </div>
     <div class="examples">
@@ -53,6 +83,11 @@
 
   <!-- 错误提示 -->
   <div id="errorBox" class="error-box hidden"></div>
+  <section id="analysisResultPanel" class="card hidden">
+    <h2><span class="idx">3</span>分析结果</h2>
+    <div id="analysisMeta" class="meta-grid"></div>
+    <div id="analysisResults"></div>
+  </section>
 
   <!-- 3. 结果区 -->
   <div id="resultPanel" class="hidden">

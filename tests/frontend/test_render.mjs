@@ -198,5 +198,82 @@ test('未知状态阶段容错', () => {
   assert.strictEqual(document.querySelector('#statusBadge').textContent, '运行中');
 });
 
+test('分析任务进度显示画像构建和算法执行阶段', () => {
+  Render.status({ task_id: 't2', task_type: 'dimensionality_reduction',
+                  status: 'RUNNING', stage: 'PROFILE_BUILD' });
+  const html = document.querySelector('#stageBox').innerHTML;
+  assert.ok(html.includes('构建用户画像'));
+  assert.ok(html.includes('active'));
+});
+
+test('降维结果渲染实际坐标、图例、指标和版本', () => {
+  Render.analysis({
+    task_type: 'dimensionality_reduction',
+    status: 'SUCCESS',
+    data_version: 'movielens-1m-v2-clean-v1',
+    profile_version: 'profile-v1',
+    T1: 'train-end', T2: 'validation-end',
+    results: [{
+      algorithm: 'pca', algorithm_name: 'PCA', algorithm_tool: 'dimensionality_reduction_pca',
+      model_version: 'model-1', result_version: 'result-1',
+      original_dimensions: 27, reduced_dimensions: 2,
+      parameters: { target_dimensions: 2 },
+      information_retention: { metric: 'explained_variance_ratio',
+        top2_cumulative: 0.8, definition: '累计解释方差比' },
+      resource_usage: { elapsed_ms: 15, peak_alloc_bytes: 1000 },
+      axis_meaning: { x: 'PC1', y: 'PC2' },
+      coordinates: [
+        { user_id: 1, x: 0, y: 0, status: 'SUCCESS', is_fit_user: true },
+        { user_id: '<script>', x: 1, y: 2,
+          status: 'PROJECTED_FROM_FITTED_MODEL', is_fit_user: false }
+      ],
+      clustering_comparison: { kmeans: {
+        algorithm: 'kmeans', parameters: { k: 2 },
+        before: { metrics: { silhouette: 0.2 } },
+        after: { metrics: { silhouette: 0.4 } },
+        comparability_note: '同一用户集合'
+      } },
+      limitations: ['视觉分离不能单独作为优劣结论']
+    }]
+  });
+  const html = document.querySelector('#analysisResults').innerHTML;
+  assert.ok(html.includes('<svg'), '应绘制实际坐标散点图');
+  assert.ok(html.includes('拟合用户') && html.includes('样本外投影'), '应解释图例');
+  assert.ok(html.includes('explained_variance_ratio'));
+  assert.ok(html.includes('0.8'));
+  assert.ok(html.includes('silhouette'));
+  assert.ok(html.includes('&lt;script&gt;'), 'SVG 文本应转义');
+  assert.ok(!html.includes('<title>用户 <script>'), '用户值不得注入 SVG');
+});
+
+test('分类和聚类分析结果字段可展示', () => {
+  Render.analysis({
+    task_type: 'classification', data_version: 'd', profile_version: 'p',
+    status: 'SUCCESS',
+    results: [{
+      algorithm_name: 'Gaussian NB', algorithm_tool: 'classification_gaussian_nb',
+      model_version: 'm', result_version: 'r', parameters: {},
+      target: { user_id: 7, movie_id: 8 }, metrics: { test_f1: 0.5 },
+      results: [{ predicted_class: 'HIGH_RATING',
+        positive_probability: 0.7, decision_score: 0.7 }]
+    }]
+  });
+  assert.ok(document.querySelector('#analysisResults').innerHTML.includes('HIGH_RATING'));
+  Render.analysis({
+    task_type: 'clustering', data_version: 'd', profile_version: 'p',
+    status: 'SUCCESS',
+    results: [{
+      algorithm_name: 'K-Means', algorithm_tool: 'clustering_kmeans',
+      model_version: 'm', result_version: 'r', parameters: {},
+      metrics: { silhouette: 0.2 },
+      assignments: [{ user_id: 7, cluster_id: 1, is_noise: false }],
+      cluster_summaries: [{ cluster_id: 1, size: 1, summary: '测试摘要' }]
+    }]
+  });
+  const html = document.querySelector('#analysisResults').innerHTML;
+  assert.ok(html.includes('测试摘要'));
+  assert.ok(html.includes('silhouette'));
+});
+
 console.log(`\n结果：${passed} 通过, ${failed} 失败`);
 process.exit(failed === 0 ? 0 : 1);

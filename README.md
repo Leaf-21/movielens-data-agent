@@ -100,7 +100,7 @@ movielens-data-agent/
 
 ```bash
 # ① 成员A：Hadoop 服务层（8080）
-python3 hadoop/src/server.py --mode local --port 8080 --data-dir data/ml-1m-v2
+
 #    local=评估用本机模拟、清洗仍提交 Hadoop Streaming 作业（需 JAVA_HOME/HADOOP_HOME）；
 #    纯演示评估任务时无需 Hadoop。--mode hadoop 已在 WSL 端到端验证可用
 #    （原 reduce 段 code 139 异常系 JAVA_HOME 指向不存在路径所致，已修复；

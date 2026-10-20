@@ -40,40 +40,45 @@ def _run_subprocess(cmd, cwd, env=None):
 
 
 def run_python_unittest(start_dir):
-    """在独立子进程中以该目录为工作目录运行 unittest discover。
+    """逐测试模块使用独立子进程，隔离项目中的同名 common 模块。
 
     子进程方式的原因：各块测试用 `import _paths` 依赖"当前目录即测试目录"
-    的约定（成员B设定），且隔离 sys.path，避免跨块模块名冲突。
+    的约定（成员B设定）；成员A/B 的工具目录都含名为 common 的模块，
+    因此还需隔离同一测试块内的模块缓存。
 
     返回 (总数, 失败数, 输出)。
     """
     if not os.path.isdir(start_dir):
         return 0, 0, '（目录不存在：%s）' % start_dir
-    has_test = any(f.startswith('test_') and f.endswith('.py')
-                   for f in os.listdir(start_dir))
-    if not has_test:
+    modules = sorted(os.path.splitext(f)[0] for f in os.listdir(start_dir)
+                     if f.startswith('test_') and f.endswith('.py'))
+    if not modules:
         return 0, 0, '（无 test_*.py 用例）'
     env = dict(os.environ)
     env['PYTHONIOENCODING'] = 'utf-8'
-    code, out = _run_subprocess(
-        [sys.executable, '-m', 'unittest', 'discover', '-v'],
-        cwd=start_dir, env=env)
     total = bad = 0
-    for line in out.splitlines():
-        s = line.strip()
-        if s.startswith('Ran ') and ' test' in s:
-            try:
-                total = int(s.split()[1])
-            except Exception:
-                pass
-    # 统计失败/错误条数（-v 下以 "FAIL:" / "ERROR:" 起头）
-    bad = sum(1 for line in out.splitlines()
-              if line.startswith('FAIL:') or line.startswith('ERROR:'))
-    if code != 0 and bad == 0 and total > 0:
-        bad = 1
-    if total == 0 and code != 0:
-        bad = 1
-    return total, bad, out
+    outputs = []
+    for module in modules:
+        code, out = _run_subprocess(
+            [sys.executable, '-m', 'unittest', '-v', module],
+            cwd=start_dir, env=env)
+        outputs.append('--- %s ---\n%s' % (module, out))
+        module_total = 0
+        module_bad = 0
+        for line in out.splitlines():
+            s = line.strip()
+            if s.startswith('Ran ') and ' test' in s:
+                try:
+                    module_total += int(s.split()[1])
+                except (ValueError, IndexError):
+                    pass
+            if line.startswith('FAIL:') or line.startswith('ERROR:'):
+                module_bad += 1
+        if code != 0 and module_bad == 0:
+            module_bad = 1
+        total += module_total
+        bad += module_bad
+    return total, bad, '\n'.join(outputs)
 
 
 def run_node_frontend():
@@ -190,6 +195,8 @@ def write_report(path, blocks):
 - Agent 能否正常调用 Hadoop（起测试夹具模拟成员A服务）；
 - Hadoop 是否成功返回结果；
 - 前端是否正确显示结果（渲染逻辑单测 + 端到端代理采样）。
+- 迭代二 PCA/t-SNE 数学性质、参数边界、可复现性与 CLI 子进程协议；
+- 迭代二分类、聚类、降维结果字段及降维坐标图例/指标的前端渲染。
 
 ### 2. 异常测试
 - Hadoop 执行失败（在 clean / before / after 各环节注入失败）；
@@ -197,6 +204,8 @@ def write_report(path, blocks):
 - 请求参数非法（缺 prompt、非法 data_version / rule_version / score_config）；
 - Agent 调用失败时前端反代返回可解析错误、不崩溃；
 - 任务超时（前端轮询上限）。
+- 分析工具信封按任务类别校验；不把聚类专属字段强加给分类或降维工具；
+- 快照缺失、未知用户和模型不可用时返回明确失败，不生成虚构分析结果。
 
 ### 3. 结果一致性测试（成员C 重点）
 验证三层数据一致：

@@ -66,14 +66,49 @@
       "algorithms": {}
     },
     "dimensionality_reduction": {
-      "_note": "成员C的两个降维工具同上。",
-      "algorithms": {}
+      "pca": {
+        "module": "dimensionality_reduction.pca_tool",
+        "entry": "run",
+        "parameters": {
+          "target_dimensions": 2,
+          "information_retention_threshold": 0.8,
+          "clustering_k": 6,
+          "clustering_seed": 42,
+          "timeout_s": 600
+        },
+        "selection_rule": "主成分数由 target_dimensions 指定（默认 2，用于可视化）；是否达成信息保留阈值由 information_retention.dimensions_for_threshold 以累计解释方差比报告；降维前后聚类对照固定同一个 k（默认 6，与聚类工具选定 k 一致）",
+        "algorithm_source": "PCA 标准定义：协方差矩阵前 d 个特征向量；课程 PPT 章节/页码尚未核实"
+      },
+      "tsne": {
+        "module": "dimensionality_reduction.tsne_tool",
+        "entry": "run",
+        "parameters": {
+          "target_dimensions": 2,
+          "perplexity": 30.0,
+          "n_iter": 1000,
+          "learning_rate": 200.0,
+          "early_exaggeration": 12.0,
+          "knn_k": 10,
+          "random_state": 42,
+          "clustering_k": 6,
+          "clustering_seed": 42,
+          "timeout_s": 1200
+        },
+        "selection_rule": "样板参数取 van der Maaten & Hinton (2008) 推荐范围（perplexity 5–50，本数据量取 30）；perplexity 必须满足 3*perplexity < 样本数；固定 random_state=42 保证同机可复现；信息保留以 kNN 一致率（相对参考）报告，不报告解释方差",
+        "algorithm_source": "van der Maaten & Hinton, JMLR 2008；课程 PPT 章节/页码尚未核实"
+      }
     }
   },
 
   "allowed_parameters": {
     "kmeans": {"k": [2, 30], "max_iter": [10, 1000], "seed": [0, 2147483647]},
-    "dbscan": {"eps": [0.01, 50.0], "min_samples": [3, 100]}
+    "dbscan": {"eps": [0.01, 50.0], "min_samples": [3, 100]},
+    "pca": {"target_dimensions": [2, 27], "information_retention_threshold": [0.0, 1.0],
+            "clustering_k": [2, 30], "clustering_seed": [0, 2147483647]},
+    "tsne": {"target_dimensions": [2, 2], "perplexity": [5.0, 50.0], "n_iter": [250, 5000],
+             "learning_rate": [10.0, 1000.0], "early_exaggeration": [1.0, 40.0],
+             "knn_k": [5, 50], "random_state": [0, 2147483647],
+             "clustering_k": [2, 30], "clustering_seed": [0, 2147483647]}
   },
 
   "artifacts": {

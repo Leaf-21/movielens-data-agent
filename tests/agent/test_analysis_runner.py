@@ -70,6 +70,16 @@ json.dump(bad, open(a.output, 'w'))
 
 class TestSubprocessProtocol(unittest.TestCase):
 
+    def test_required_envelope_keys_follow_task_type(self):
+        self.assertIn('coordinates',
+                      analysis_runner.required_env_keys('dimensionality_reduction'))
+        self.assertIn('information_retention',
+                      analysis_runner.required_env_keys('dimensionality_reduction'))
+        self.assertNotIn('assignments',
+                         analysis_runner.required_env_keys('dimensionality_reduction'))
+        self.assertIn('assignments', analysis_runner.required_env_keys('clustering'))
+        self.assertIn('results', analysis_runner.required_env_keys('classification'))
+
     def setUp(self):
         self.work = tempfile.TemporaryDirectory()
         self._orig_mf = registry.module_file
