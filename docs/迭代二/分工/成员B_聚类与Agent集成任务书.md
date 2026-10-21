@@ -79,7 +79,7 @@ agent/
 - [x] 可复现的用户画像构建流程（`build_profile.py` + `run_fit.py`；profile-v1 sha256 登记，HEAD 3c7c210 复跑字节不变，见提交 072e654）
 - [x] 用户群体归属、群体摘要和代表性内容（信封 `assignments`/`cluster_summaries`，`summary_basis` 口径原文；报告 §1/§2）
 - [x] 聚类评价指标及适用限制（`metrics.definition` 逐指标；不适用如实 null；噪声/eps 敏感性见报告 §3）
-- [ ] 六种算法工具注册表/调用映射——B 侧统一注册机制已完成并有测试（`registry.py`+`analysis.json`，未登记类别诚实回 `MODEL_NOT_FOUND`）；分类/降维四工具**待成员A/C交付后登记**，登记即自动激活
+- [x] 六种算法工具注册表/调用映射——B 侧统一注册机制已完成并有测试（`registry.py`+`analysis.json`，未登记类别诚实回 `MODEL_NOT_FOUND`）；**六工具已全部登记激活**：聚类 `clustering_kmeans`/`clustering_dbscan`（B）、分类 `classification_gnb`/`classification_cart`（A，`fa51d76` 接通）、降维 `dimensionality_reduction_pca`/`dimensionality_reduction_tsne`（C，`e2e59e2`）。`GET /health` 的 `analysis.registered_tools` 实测返回六项；六工具 CLI 逐一独立调用 SUCCESS（PCA/t-SNE 各取 120 个拟合用户），三类任务端到端 task_20261021_0002/0003/0006 均 SUCCESS
 - [x] 三类自然语言请求的路由规则（`router.py`；聚类/分类/降维识别、误类别引导、指定/默认双算法；`test_registry_router.py` 19 用例）
 - [x] 统一任务 ID、状态、结果查询和错误封装（复用迭代一 `GET /api/tasks/{id}`；§2.1 错误码；拒绝路径零僵尸任务实测）
 - [x] 未指定算法时双算法对照；指定算法时仅调用对应算法（实测 task_20261018_0003 双对照 / _0013、_0014 指定单算法）

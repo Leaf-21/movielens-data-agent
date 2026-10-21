@@ -16,6 +16,11 @@
   run(payload: dict, acfg=None, rcfg=None) -> 统一信封 dict；失败抛 AnalysisError。
   CLI：python3 -I <file> --request req.json --output out.json
        成功打印 {"status":"SUCCESS",...}；失败打印 FAILED+error，退出码 2。
+  调度器实际调用走 analysis_runner.tool_command()：仍是 -I 隔离进程，但经 -c 引导脚本
+  把用户级 site-packages 补回 sys.path（-I 隐含 -s，pip install --user 装的
+  numpy/sklearn 原本不可见，2026-10-21 修复），并统一注入 ML_CLEAN_DIR 指向
+  analysis.json 登记的清洗快照（聚类与分类/降维此前默认路径不同，已在 runner 统一）。
+  结论：工具的第三方依赖无论装在系统目录还是用户目录都可用。
 命名约定（接口扩展规范 §七）：clustering_<algorithm> / classification_<algorithm> /
 dimensionality_reduction_<algorithm>。
 """

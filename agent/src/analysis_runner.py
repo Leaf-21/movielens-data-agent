@@ -20,6 +20,7 @@
 
 import json
 import os
+import site as _site
 import subprocess
 import sys
 import time
@@ -39,6 +40,79 @@ import registry                    # noqa: E402
 from common import AnalysisError   # noqa: E402
 
 RUNTIME_ANALYSIS_DIR = os.path.join(config.AGENT_DIR, 'runtime', 'analysis')
+
+# ---------------------------------------------------------------------------
+# 工具子进程：`-I` 隔离 + 第三方依赖可见性（2026-10-21 修复的两处环境缺陷）
+# ---------------------------------------------------------------------------
+# 缺陷一（依赖不可见）：工具按接口规范以 `python3 -I` 启动（隔离模式保证 WSL
+#   的段错误只影响子进程，不带走 API 服务）。但 `-I` 隐含 `-s`，**不含用户级
+#   site-packages**；当 numpy / scikit-learn 由 `pip install --user` 装在
+#   `~/.local/lib/pythonX.Y/site-packages` 时，分类与降维工具在 import 阶段就
+#   ModuleNotFoundError，被上层折叠成 "ALGORITHM_ERROR 子进程执行失败（已重试）"，
+#   现象像"工具坏了"，实际只是解释器静态路径问题（聚类工具纯标准库，不受影响）。
+#   处置：仍用 `-I` 起子进程，但在 `-c` 引导脚本里把用户级站点目录**追加**回
+#   sys.path 后 runpy 执行工具本体 —— 既保留进程隔离，又不依赖依赖装在哪。
+#   引导脚本刻意不把工具所在目录塞进 sys.path：`-I` 的语义就是"不含脚本目录"，
+#   各工具自己显式入径（文件头注释），这里保持原有隔离语义不变。
+#   其它目录可用 ML_TOOL_EXTRA_PATH（os.pathsep 分隔）追加。
+# 缺陷二（快照路径不一致）：聚类工具读 analysis.json 的 input.clean_dir
+#   （= hadoop/output/clean），而分类/降维走 agent/tools/common/split.py 的
+#   clean_dir()，默认是 data/<清洗版本>/。两处默认值不同，"三类任务读同一份
+#   清洗快照"这条口径在默认配置下并不成立，分类/降维直接 DATA_UNAVAILABLE。
+#   处置：子进程环境里以 analysis.json 的登记值为准注入 ML_CLEAN_DIR
+#   （调用方显式设置的 ML_CLEAN_DIR 优先，绝不覆盖）。
+_TOOL_BOOTSTRAP = (
+    'import os, runpy, sys\n'
+    '_extra = sys.argv[1]\n'
+    'for _p in _extra.split(os.pathsep):\n'
+    '    if _p and _p not in sys.path:\n'
+    '        sys.path.append(_p)\n'
+    'sys.argv = sys.argv[2:]\n'
+    'runpy.run_path(os.path.abspath(sys.argv[0]), run_name="__main__")\n'
+)
+
+
+def tool_search_paths():
+    """工具子进程需要额外可见的依赖目录：存在的、去重、保序。"""
+    cands = []
+    extra = os.environ.get('ML_TOOL_EXTRA_PATH')
+    if extra:
+        cands.extend(extra.split(os.pathsep))
+    try:
+        user_site = _site.getusersitepackages()
+    except Exception:                      # pragma: no cover - 极端解释器
+        user_site = None
+    if isinstance(user_site, (list, tuple)):
+        cands.extend(user_site)
+    elif user_site:
+        cands.append(user_site)
+    out = []
+    for p in cands:
+        p = (p or '').strip()
+        if p and os.path.isdir(p) and p not in out:
+            out.append(p)
+    return out
+
+
+def tool_command(tool_file, *args):
+    """工具子进程命令行：`-I` 隔离 + 引导脚本补依赖路径。"""
+    return [sys.executable, '-I', '-c', _TOOL_BOOTSTRAP,
+            os.pathsep.join(tool_search_paths()), tool_file] + list(args)
+
+
+def tool_env():
+    """工具子进程环境：按 analysis.json 统一清洗快照路径（显式 env 优先）。"""
+    env = dict(os.environ)
+    if not env.get('ML_CLEAN_DIR'):
+        try:
+            p = config.resolve_repo_path(config.load_analysis()['input']['clean_dir'])
+        except (KeyError, TypeError, RuntimeError):
+            p = None
+        if p and os.path.isdir(p):
+            env['ML_CLEAN_DIR'] = p
+    env.setdefault('PYTHONIOENCODING', 'utf-8')
+    return env
+
 
 # 工具信封必需键（缺任何一个都视为工具违约 -> ALGORITHM_ERROR，不入库假结果）
 COMMON_ENV_KEYS = ('algorithm', 'algorithm_tool', 'model_version', 'result_version',
@@ -77,8 +151,9 @@ def _run_tool_subprocess(entry, algo, task_id, payload, log_lines,
     out_path = os.path.join(work, 'result-%s.json' % algo)
     with open(req_path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False)
-    cmd = [sys.executable, '-I', tool_file,
-           '--request', req_path, '--output', out_path]
+    cmd = tool_command(tool_file, '--request', req_path,
+                      '--output', out_path)
+    child_env = tool_env()
     timeout = float(entry.get('timeout_s', 600))
     last = None
     for attempt in (1, 2):
@@ -88,7 +163,7 @@ def _run_tool_subprocess(entry, algo, task_id, payload, log_lines,
             os.remove(out_path)
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True,
-                                  timeout=timeout)
+                                  timeout=timeout, env=child_env)
         except subprocess.TimeoutExpired:
             last = ('超时(%.0fs)' % timeout, -1, '')
             log_lines.append('%s 第%d次尝试超时' % (algo, attempt))
@@ -149,8 +224,9 @@ def _profile_stage(store, task_id):
     last_err = None
     for _ in (1, 2):
         try:
-            proc = subprocess.run([sys.executable, '-I', script],
-                                  capture_output=True, text=True, timeout=300)
+            proc = subprocess.run(tool_command(script),
+                                  capture_output=True, text=True,
+                                  timeout=300, env=tool_env())
         except subprocess.TimeoutExpired:
             last_err = '画像构建超时'
             continue

@@ -8,6 +8,7 @@
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -144,6 +145,124 @@ class TestSubprocessProtocol(unittest.TestCase):
             self._run('broken_env')
         self.assertEqual(cm.exception.code, 'ALGORITHM_ERROR')
         self.assertIn('工具违约', cm.exception.message)
+
+
+
+class TestToolSubprocessEnv(unittest.TestCase):
+    """回归 2026-10-21 修好的两处环境缺陷（本机曾导致分类/降维整类任务失败）。
+
+    缺陷一：`python3 -I` 隐含 `-s`，不含用户级 site-packages，numpy 装在
+      `pip install --user` 时分类/降维子进程 import 即失败；
+    缺陷二：分类/降维默认读 `data/<清洗版本>/`，与聚类读的
+      `analysis.json.input.clean_dir` 不是同一路径，默认配置下 DATA_UNAVAILABLE。
+    """
+
+    def test_tool_command_keeps_isolation_flag(self):
+        cmd = analysis_runner.tool_command('/x/tool.py', '--request', 'r.json')
+        self.assertEqual(cmd[0], sys.executable)
+        self.assertEqual(cmd[1], '-I')          # 隔离隔离语义必须保留（防 WSL 段错误）
+        self.assertEqual(cmd[2], '-c')
+        self.assertIn('runpy', cmd[3])
+        self.assertEqual(cmd[-3], '/x/tool.py')
+        self.assertEqual(cmd[-2:], ['--request', 'r.json'])
+
+    def test_tool_command_carries_user_site(self):
+        paths = analysis_runner.tool_search_paths()
+        user_site = None
+        try:
+            import site
+            user_site = site.getusersitepackages()
+        except Exception:
+            pass
+        if user_site and os.path.isdir(user_site):
+            self.assertIn(user_site, paths)
+        for p in paths:
+            self.assertTrue(os.path.isdir(p), '只登记真实存在的目录: %s' % p)
+
+    def test_extra_path_env_appended_without_duplicates(self):
+        wd = tempfile.TemporaryDirectory()
+        self.addCleanup(wd.cleanup)
+        orig = os.environ.get('ML_TOOL_EXTRA_PATH')
+        os.environ['ML_TOOL_EXTRA_PATH'] = os.pathsep.join(
+            [wd.name, wd.name, '/no/such/dir'])
+        try:
+            paths = analysis_runner.tool_search_paths()
+        finally:
+            if orig is None:
+                os.environ.pop('ML_TOOL_EXTRA_PATH', None)
+            else:
+                os.environ['ML_TOOL_EXTRA_PATH'] = orig
+        self.assertEqual(paths.count(wd.name), 1)   # 去重
+        self.assertNotIn('/no/such/dir', paths)     # 不存在的目录不进
+
+    def test_tool_env_injects_clean_dir_from_analysis_config(self):
+        orig = os.environ.pop('ML_CLEAN_DIR', None)
+        try:
+            env = analysis_runner.tool_env()
+        finally:
+            if orig is not None:
+                os.environ['ML_CLEAN_DIR'] = orig
+        expect = config.resolve_repo_path(config.load_analysis()['input']['clean_dir'])
+        if os.path.isdir(expect):
+            self.assertEqual(env['ML_CLEAN_DIR'], expect)
+        self.assertEqual(env.get('PYTHONIOENCODING'), 'utf-8')
+
+    def test_tool_env_never_overrides_explicit_clean_dir(self):
+        orig = os.environ.get('ML_CLEAN_DIR')
+        os.environ['ML_CLEAN_DIR'] = '/explicit/choice'
+        try:
+            env = analysis_runner.tool_env()
+        finally:
+            if orig is None:
+                os.environ.pop('ML_CLEAN_DIR', None)
+            else:
+                os.environ['ML_CLEAN_DIR'] = orig
+        self.assertEqual(env['ML_CLEAN_DIR'], '/explicit/choice')
+
+    def test_child_can_import_user_site_package(self):
+        """端到端：`-I` 子进程里能否 import numpy（缺依赖则跳过，不伪装通过）。"""
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest('本机未安装 numpy，跳过依赖可见性验证')
+        wd = tempfile.TemporaryDirectory()
+        self.addCleanup(wd.cleanup)
+        script = os.path.join(wd.name, 'probe.py')
+        out = os.path.join(wd.name, 'probe.json')
+        with open(script, 'w', encoding='utf-8') as f:
+            f.write("""
+import argparse, json
+p = argparse.ArgumentParser(); p.add_argument('--output')
+a = p.parse_args()
+import numpy
+json.dump({'numpy': numpy.__version__}, open(a.output, 'w'))
+""")
+        cmd = analysis_runner.tool_command(script, '--output', out)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
+                              env=analysis_runner.tool_env())
+        self.assertEqual(proc.returncode, 0, proc.stderr[-1500:])
+        with open(out, encoding='utf-8') as f:
+            self.assertTrue(json.load(f)['numpy'])
+
+    def test_child_receives_clean_dir(self):
+        wd = tempfile.TemporaryDirectory()
+        self.addCleanup(wd.cleanup)
+        script = os.path.join(wd.name, 'envprobe.py')
+        out = os.path.join(wd.name, 'env.json')
+        with open(script, 'w', encoding='utf-8') as f:
+            f.write("""
+import argparse, json, os
+p = argparse.ArgumentParser(); p.add_argument('--output')
+a = p.parse_args()
+json.dump({'clean': os.environ.get('ML_CLEAN_DIR')}, open(a.output, 'w'))
+""")
+        cmd = analysis_runner.tool_command(script, '--output', out)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
+                              env=analysis_runner.tool_env())
+        self.assertEqual(proc.returncode, 0, proc.stderr[-1500:])
+        with open(out, encoding='utf-8') as f:
+            clean = json.load(f)['clean']
+        self.assertTrue(clean, '子进程必须拿到 ML_CLEAN_DIR（否则分类/降维 DATA_UNAVAILABLE）')
 
 
 class TestRunTask(unittest.TestCase):
