@@ -244,6 +244,58 @@ json.dump({'numpy': numpy.__version__}, open(a.output, 'w'))
         with open(out, encoding='utf-8') as f:
             self.assertTrue(json.load(f)['numpy'])
 
+    def test_missing_dependency_detected(self):
+        """依赖缺失要从 stderr 里认出来（numpy/sklearn 两种写法）。"""
+        cases = [
+            ("Traceback (most recent call last):\n"
+             "  File \"x.py\", line 30, in <module>\n"
+             "    import numpy as np\n"
+             "ModuleNotFoundError: No module named 'numpy'", 'numpy'),
+            ("ModuleNotFoundError: No module named 'sklearn.tree'", 'sklearn'),
+            ("ImportError: cannot import name 'foo'", None),
+            ("", None),
+            ("Some unrelated failure", None),
+        ]
+        for stderr, expect in cases:
+            self.assertEqual(analysis_runner.missing_dependency(stderr), expect,
+                             'stderr=%r' % stderr[:60])
+
+    def test_dependency_hint_is_actionable(self):
+        """提示必须同时给出装依赖与加路径两条修法，并能用 ML_TOOL_EXTRA_PATH。"""
+        hint = analysis_runner.dependency_hint('numpy')
+        self.assertIn('numpy', hint)
+        self.assertIn('pip install -r requirements.txt', hint)
+        self.assertIn('ML_TOOL_EXTRA_PATH', hint)
+        self.assertIn('-I', hint)          # 说明为什么仍是隔离模式
+
+    def test_real_missing_dependency_surfaces_actionable_error(self):
+        """端到端：子进程真缺模块时，错误消息应含修法而不是只报"退出码 1"。"""
+        wd = tempfile.TemporaryDirectory()
+        self.addCleanup(wd.cleanup)
+        script = os.path.join(wd.name, 'needs_missing.py')
+        out = os.path.join(wd.name, 'never.json')
+        with open(script, 'w', encoding='utf-8') as f:
+            f.write("import totally_absent_module_xyz\n")
+        orig_cmd = analysis_runner.tool_command
+        orig_mf = registry.module_file
+        analysis_runner.tool_command = lambda tool, *a: ([sys.executable, '-I', tool]
+                                                         + list(a))
+        registry.module_file = lambda entry: script
+        try:
+            with self.assertRaises(AnalysisError) as cm:
+                analysis_runner._run_tool_subprocess(
+                    {'timeout_s': 60}, 'fake', 'test_missingdep',
+                    {'user_ids': [1]}, [])
+        finally:
+            analysis_runner.tool_command = orig_cmd
+            registry.module_file = orig_mf
+        self.assertEqual(cm.exception.code, 'ALGORITHM_ERROR')
+        msg = cm.exception.message
+        self.assertIn('totally_absent_module_xyz', msg)
+        self.assertIn('pip install', msg)
+        self.assertEqual(cm.exception.details.get('missing_module'),
+                         'totally_absent_module_xyz')
+
     def test_child_receives_clean_dir(self):
         wd = tempfile.TemporaryDirectory()
         self.addCleanup(wd.cleanup)
