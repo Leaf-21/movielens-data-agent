@@ -20,6 +20,7 @@
 
 import json
 import os
+import re
 import site as _site
 import subprocess
 import sys
@@ -133,6 +134,32 @@ def required_env_keys(category):
     return COMMON_ENV_KEYS + CATEGORY_ENV_KEYS.get(category, ())
 
 
+# 第三方依赖缺失的识别：`-I` 子进程若连 numpy 都导入不了，真实原因是
+# "依赖没装"或"装在解释器看不到的位置"，但原始报错只是一行 ModuleNotFoundError，
+# 被折叠成"子进程执行失败"后很难判断该改什么。这里识别出来并给出可操作提示。
+_IMPORT_ERROR_RE = re.compile(r"ModuleNotFoundError:\s*No module named '([^']+)'")
+
+
+def missing_dependency(stderr):
+    """从工具子进程 stderr 里取缺失的顶层模块名；没有则返回 None。"""
+    if not stderr:
+        return None
+    m = _IMPORT_ERROR_RE.search(stderr)
+    return m.group(1).split('.')[0] if m else None
+
+
+def dependency_hint(module):
+    """依赖缺失时的可操作提示（区分"没装"与"装错位置"两种情况）。"""
+    return ('分析工具的第三方依赖 %r 在子进程里不可用。'
+            '子进程仍以 `-I` 启动（隔离模式，避免 WSL2 段错误带走 API 服务），'
+            '调度器已自动把用户级 site-packages 补进 sys.path，因此常见原因只有两个：'
+            '① 本机确实没装 —— 执行 `python3 -m pip install -r requirements.txt`；'
+            '② 装在解释器默认路径之外 —— 用环境变量 `ML_TOOL_EXTRA_PATH` 指向该目录'
+            '（多个目录用 %r 分隔）后重试。'
+            '排查:`python3 -c "import %s"` 与 `python3 -I -c "import %s"` 对比即可定位。'
+            % (module, os.pathsep, module, module))
+
+
 def _task_workdir(task_id):
     d = os.path.join(RUNTIME_ANALYSIS_DIR, task_id)
     os.makedirs(d, exist_ok=True)
@@ -208,11 +235,24 @@ def _run_tool_subprocess(entry, algo, task_id, payload, log_lines,
             log_lines.append('%s 第%d次尝试失败: %s' % (algo, attempt, last[0]))
             continue
         last = ('退出 0 但输出文件缺失', 0, stderr)
+    reason = last[0] if last else '未知原因'
+    stderr_tail = (last[2] if last else '')
+    detail = {'algorithm': algo,
+              'exit': last[1] if last else None,
+              'stderr_tail': stderr_tail[-1500:]}
+    module = missing_dependency(stderr_tail)
+    if module:
+        # 依赖缺失是环境问题，不是算法失败：错误消息直接给出修法，
+        # 并在 detail 里单列 missing_module 便于前端/排查脚本识别。
+        detail['missing_module'] = module
+        raise AnalysisError(
+            'ALGORITHM_ERROR',
+            '%s 子进程执行失败（已重试）：%s' % (algo, dependency_hint(module)),
+            detail)
     raise AnalysisError(
         'ALGORITHM_ERROR',
-        '%s 子进程执行失败（已重试）: %s' % (algo, last[0] if last else '未知原因'),
-        {'algorithm': algo, 'exit': last[1] if last else None,
-         'stderr_tail': (last[2] if last else '')[-1500:]})
+        '%s 子进程执行失败（已重试）: %s' % (algo, reason),
+        detail)
 
 
 def _profile_stage(store, task_id):
