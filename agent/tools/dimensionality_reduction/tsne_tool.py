@@ -221,7 +221,6 @@ def knn_agreement(X_hi, Y_lo, k=10):
 def run(payload, acfg=None, rcfg=None, quiet=True):
     t0 = time.time()
     tracemalloc.start()
-    np = _numpy()
     acfg = acfg or config.load_analysis()
     rcfg = rcfg or config.load_rules()
     params = D.validate_dr_params(payload.get('parameters'))
@@ -233,6 +232,9 @@ def run(payload, acfg=None, rcfg=None, quiet=True):
         raise AnalysisError('INVALID_PARAMETER',
                             't-SNE 本工具只支持二维输出（target_dimensions=2）；'
                             '三维可视化不在本迭代范围')
+    # 报错语义：用户错误（参数非法/越界）必须先于环境错误（缺 numpy）暴露，
+    # 否则「依赖缺失」会掩盖「参数非法」。故 numpy 在参数校验之后才解析。
+    np = _numpy()
     perplexity = float(base_params.get('perplexity', 30))
     n_iter = int(base_params.get('n_iter', 1000))
     early_exag = float(base_params.get('early_exaggeration', 12.0))

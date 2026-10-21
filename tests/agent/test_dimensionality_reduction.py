@@ -290,6 +290,35 @@ class TestToolEnvelopes(unittest.TestCase):
         self.assertIsNone(result['information_retention']['explained_variance_ratio'])
         self.assertTrue(result['clustering_comparison']['kmeans']['same_user_set'])
 
+    def test_tsne_params_checked_before_numpy(self):
+        """报错语义（回归 test_tsne_unknown_parameter_exit_2）。
+
+        参数非法是用户错误，必须先于「缺 numpy」这个环境错误暴露：numpy 解析若写在
+        参数校验之前，在依赖不可见的环境里裸跑工具就会变成 ALGORITHM_ERROR。
+        """
+        import builtins
+        real_import = builtins.__import__
+
+        def no_numpy(name, *a, **k):
+            if name == 'numpy' or name.startswith('numpy.'):
+                raise ImportError('simulated: numpy unavailable')
+            return real_import(name, *a, **k)
+
+        # 参数非法 -> INVALID_PARAMETER，不受依赖缺失影响
+        with mock.patch.object(builtins, '__import__', side_effect=no_numpy):
+            with self.assertRaises(AnalysisError) as cm:
+                tsne_tool.run({'user_ids': [1, 2, 3],
+                               'parameters': {'foo': 1}},
+                              self.acfg, self.rcfg)
+        self.assertEqual(cm.exception.code, 'INVALID_PARAMETER')
+        # 参数合法时才轮到环境错误：缺依赖如实报 ALGORITHM_ERROR
+        with mock.patch.object(builtins, '__import__', side_effect=no_numpy):
+            with self.assertRaises(AnalysisError) as cm2:
+                tsne_tool.run({'user_ids': [1, 2, 3], 'parameters': {}},
+                              self.acfg, self.rcfg)
+        self.assertEqual(cm2.exception.code, 'ALGORITHM_ERROR')
+        self.assertIn('numpy', cm2.exception.message)
+
 
 class TestCliProtocol(unittest.TestCase):
     """端到端 CLI：--request/--output 子进程协议与失败码。"""
