@@ -314,7 +314,17 @@ json.dump({'clean': os.environ.get('ML_CLEAN_DIR')}, open(a.output, 'w'))
         self.assertEqual(proc.returncode, 0, proc.stderr[-1500:])
         with open(out, encoding='utf-8') as f:
             clean = json.load(f)['clean']
-        self.assertTrue(clean, '子进程必须拿到 ML_CLEAN_DIR（否则分类/降维 DATA_UNAVAILABLE）')
+        # 只有清洗快照真实存在时才应注入；快照不存在（如刚克隆/解包、
+        # 尚未跑过清洗）时 tool_env 刻意不注入，让工具自己如实报
+        # DATA_UNAVAILABLE，而不是把子进程指向一个空目录。
+        expect = config.resolve_repo_path(
+            config.load_analysis()['input']['clean_dir'])
+        if os.path.isdir(expect):
+            self.assertEqual(clean, expect,
+                             '快照存在时子进程必须拿到 ML_CLEAN_DIR')
+        else:
+            self.assertIsNone(clean,
+                              '快照不存在时不应注入 ML_CLEAN_DIR（应让工具如实报错）')
 
 
 class TestRunTask(unittest.TestCase):
