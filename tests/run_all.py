@@ -25,6 +25,10 @@ import sys
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# 统一测试入口一律不访问真实大模型：追问已改为大模型主路径，
+# 不关闭会让测试真的发网络请求（慢且不确定）。
+os.environ.setdefault('ML_LLM_DISABLE', '1')
 REPO = os.path.dirname(HERE)
 
 

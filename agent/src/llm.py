@@ -314,12 +314,48 @@ def _call(system_text, user_text, effort=None, max_tokens=4096):
                 # 4xx 属于配置/鉴权问题，重试无意义
                 if 'HTTP 4' in str(e):
                     break
-        print('[agent.llm] 调用失败（%s），回退到模板路径: %s'
+        print('[agent.llm] 调用失败（%s），追问将返回“不可用”提示: %s'
               % (cfg['provider'], last))
         return None
     except Exception as e:                  # 兜底：绝不影响主流程
-        print('[agent.llm] 调用异常，回退到模板路径: %s' % e)
+        print('[agent.llm] 调用异常，追问将返回“不可用”提示: %s' % e)
         return None
+
+
+#: 路由类别白名单（与 registry.CATEGORIES 一致，避免循环 import 故在此重复）
+ROUTE_CATEGORIES = ('clustering', 'classification', 'dimensionality_reduction')
+
+
+def classify_category(text, attempts=2):
+    """
+    意图路由：判断这句话涉及哪些分析类别。
+    返回 {'categories': [...], 'confidence': str} 或 None。
+
+    None 表示"无法判断"（模型不可用 / 调用失败 / 输出不合规），
+    调用方应据此跳过类别一致性检查，**不得**用规则猜一个类别顶替。
+    """
+    if not enabled():
+        return None
+    system_text = _system('system_route.txt')
+    for _ in range(max(1, attempts)):
+        raw = _call(system_text, text or '', max_tokens=200)
+        if not raw:
+            continue
+        start, end = raw.find('{'), raw.rfind('}')
+        if start < 0 or end <= start:
+            continue
+        try:
+            obj = json.loads(raw[start:end + 1])
+        except ValueError:
+            continue
+        cats = obj.get('categories')
+        if not isinstance(cats, list):
+            continue
+        # 过滤掉白名单以外的值；模型可能给出同义写法
+        clean = [c for c in cats if c in ROUTE_CATEGORIES]
+        return {'categories': clean,
+                'confidence': obj.get('confidence') or 'low'}
+    return None
 
 
 def classify_intent(prompt):
@@ -345,13 +381,16 @@ def classify_intent(prompt):
     return {'do_clean': bool(obj['do_clean'])}
 
 
-def answer_question(question, evidence):
+def answer_question(question, evidence, max_tokens=1024):
     """
-    基于结果证据回答用户追问。
-    evidence 只含已经真实执行产生的数字；返回 None 表示应回退模板。
+    基于结果证据生成回答。
+    evidence 只含已经真实执行产生的数字；返回 None 表示调用失败。
+
+    max_tokens 默认 1024：系统提示已要求回答 <=300 字，给太大反而会让
+    模型长篇发挥、显著拉长响应时间。
     """
     if not enabled():
         return None
     user = '【任务结果 JSON（真实执行产物，唯一数字来源）】\n%s\n\n【用户问题】\n%s' % (
         json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True), question)
-    return _call(_system('system_explain.txt'), user, max_tokens=4096)
+    return _call(_system('system_explain.txt'), user, max_tokens=max_tokens)

@@ -233,8 +233,9 @@ class TestAgentApi(unittest.TestCase):
         st, resp = self.post_json('/api/tasks/%s/ask' % created['task_id'],
                                   {'question': '被隔离的记录算修复了吗'})
         self.assertEqual(st, 200)
-        self.assertEqual(resp['source'], 'template')
-        self.assertIn('未被修正', resp['answer'])
+        # 追问已改为大模型主路径；单测环境禁用真实模型，应如实报「不可用」
+        self.assertEqual(resp['source'], 'unavailable')
+        self.assertIn('未配置可用的语言模型', resp['answer'])
 
     def test_ask_requires_question(self):
         created = self._create()

@@ -9,6 +9,7 @@
 import os
 import sys
 import unittest
+from unittest import mock
 
 import _paths  # noqa: F401
 from _paths import AGENT_TOOLS
@@ -19,6 +20,7 @@ if _C not in sys.path:
 
 import config          # noqa: E402
 import registry        # noqa: E402
+import llm
 import router as nl_router  # noqa: E402
 from common import AnalysisError  # noqa: E402
 
@@ -161,16 +163,41 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(cm3.exception.code, 'VERSION_MISMATCH')
 
     def test_category_consistency_guidance(self):
-        with self.assertRaises(AnalysisError) as cm:
-            self._route('classification', {'query': '给用户做聚类',
-                                           'user_ids': [1]})
+        """类别识别已交给大模型：这里 mock 模型的判定结果，验证引导逻辑本身。"""
+        with mock.patch.object(llm, 'classify_category',
+                               return_value={'categories': ['clustering'],
+                                             'confidence': 'high'}):
+            with self.assertRaises(AnalysisError) as cm:
+                self._route('classification', {'query': '给用户做聚类',
+                                               'user_ids': [1]})
         self.assertEqual(cm.exception.code, 'INVALID_REQUEST')
         self.assertIn('/api/analysis/clustering/tasks', cm.exception.message)
-        with self.assertRaises(AnalysisError) as cm2:
-            self._route('clustering', {'query': '聚类并降维用户 1',
-                                       'user_ids': [1]})
+
+        with mock.patch.object(llm, 'classify_category',
+                               return_value={'categories': ['clustering',
+                                                           'dimensionality_reduction'],
+                                             'confidence': 'high'}):
+            with self.assertRaises(AnalysisError) as cm2:
+                self._route('clustering', {'query': '聚类并降维用户 1',
+                                           'user_ids': [1]})
         self.assertEqual(cm2.exception.code, 'INVALID_REQUEST')
         self.assertIn('拆分', cm2.exception.message)
+
+    def test_category_check_skipped_when_model_unavailable(self):
+        """模型不可用时不做类别猜测：按 URL 指定的类别继续，不误报引导。"""
+        with mock.patch.object(llm, 'classify_category', return_value=None):
+            plan = self._route('clustering', {'query': '给用户做聚类',
+                                              'user_ids': [1]})
+        self.assertEqual(plan['task_type'], 'clustering')
+
+    def test_unrelated_query_passes_through(self):
+        """模型判定 query 未指向任何类别时不应报错，按 URL 继续。"""
+        with mock.patch.object(llm, 'classify_category',
+                               return_value={'categories': [],
+                                             'confidence': 'low'}):
+            plan = self._route('clustering', {'query': '帮我看看这批人',
+                                              'user_ids': [1]})
+        self.assertEqual(plan['task_type'], 'clustering')
 
     def test_parameters_pruned_per_algorithm(self):
         plan = self._route('clustering', {'user_ids': [1],

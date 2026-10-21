@@ -40,20 +40,11 @@ from clustering.schemas import (validate_parameters, normalize_targets)  # noqa:
 from dr_common import validate_dr_params  # noqa: E402
 from common import (AnalysisError, INVALID_REQUEST,      # noqa: E402
                     VERSION_MISMATCH)
+import llm                                             # noqa: E402
 
 URL_CATEGORY = {'clustering': 'clustering',
                 'classification': 'classification',
                 'dimensionality-reduction': 'dimensionality_reduction'}
-
-# 类别关键词（小写匹配；中文直接子串）
-CATEGORY_KEYWORDS = {
-    'clustering': ['聚类', '分群', '群体', '人群', '簇', 'cluster', 'kmeans',
-                   'k-means', 'k 均值', 'k均值', 'dbscan', '密度聚类'],
-    'classification': ['分类', '预测', '会喜欢', '会不会喜欢', '高分', '是否喜欢',
-                       'predict', 'classification'],
-    'dimensionality_reduction': ['降维', '主成分', '坐标', '二维', '投影',
-                                 '可视化', 'pca', 't-sne', 'tsne', 'umap'],
-}
 
 ALGO_KEYWORDS = {
     'clustering': {'kmeans': ['kmeans', 'k-means', 'k 均值', 'k均值'],
@@ -72,12 +63,6 @@ def _extract_user_ids(text):
         for m in rx.finditer(text or ''):
             ids.add(int(m.group(1)))
     return sorted(ids)
-
-
-def _detect_categories(text):
-    low = (text or '').lower()
-    return [c for c, kws in CATEGORY_KEYWORDS.items()
-            if any(k.lower() in low for k in kws)]
 
 
 def route(url_category, payload):
@@ -102,19 +87,32 @@ def route(url_category, payload):
     notes = []
 
     # ---- 0) 类别一致性：URL 权威，query 描述别处 -> 引导（规范 §2.2/§七）----
-    det = _detect_categories(text)
-    if det and category not in det:
-        raise AnalysisError(
-            INVALID_REQUEST,
-            '查询内容属于 %s 类别，请在 /api/analysis/%s/tasks 提交'
-            % ('/'.join(det), 'clustering' if 'clustering' in det
-               else ('classification' if 'classification' in det
-                     else 'dimensionality-reduction')))
-    if len(det) > 1:
-        raise AnalysisError(
-            INVALID_REQUEST,
-            '查询同时涉及多个分析类别（%s），一次任务只做一个类别，请拆分提交'
-            % '、'.join(det))
+    # 类别识别由**大模型**完成（团队决定：语言理解统一交给模型，不再用关键词规则）。
+    # 模型不可用或判定失败时**跳过该检查**——URL 本身就是权威类别，
+    # 绝不能为了"看起来在工作"而用规则猜一个类别顶替。
+    verdict = llm.classify_category(text) if text.strip() else None
+    if verdict is None:
+        if text.strip() and llm.enabled():
+            notes.append('大模型未能判定 query 涉及的类别，已按 URL 指定的 %s 执行，'
+                         '未做类别一致性校验。' % category)
+    else:
+        det = verdict['categories']
+        if det and category not in det:
+            raise AnalysisError(
+                INVALID_REQUEST,
+                '查询内容属于 %s 类别，请在 /api/analysis/%s/tasks 提交'
+                % ('/'.join(det),
+                   {'clustering': 'clustering',
+                    'classification': 'classification'}.get(
+                       det[0], 'dimensionality-reduction')))
+        if len(det) > 1:
+            raise AnalysisError(
+                INVALID_REQUEST,
+                '查询同时涉及多个分析类别（%s），一次任务只做一个类别，请拆分提交'
+                % '、'.join(det))
+        if not det:
+            notes.append('大模型判断 query 未明确指向某个分析类别，'
+                         '已按 URL 指定的 %s 执行。' % category)
 
     # ---- 1) 版本校验（配置口径唯一，不匹配即 VERSION_MISMATCH）----
     dv = payload.get('data_version')

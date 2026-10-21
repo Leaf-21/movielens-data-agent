@@ -118,12 +118,13 @@ class TestAnalysisApi(unittest.TestCase):
         self.assertEqual(rec['status'], 'SUCCESS', rec.get('message'))
         ask = _post(self.base + '/api/tasks/%s/ask' % resp['task_id'],
                     {'question': '用户 1 属于哪个群体？'})
-        self.assertEqual(ask['source'], 'template')
-        self.assertIn('clustering_kmeans', ask['answer'])
-        self.assertIn('群体', ask['answer'])
+        # 追问已改为大模型主路径（模板已移除）。单元测试环境禁用真实模型，
+        # 因此应如实返回「不可用」，而不是拿模板凑一段看似完整的答案。
+        self.assertEqual(ask['source'], 'unavailable')
+        self.assertIn('未配置可用的语言模型', ask['answer'])
         ask2 = _post(self.base + '/api/tasks/%s/ask' % resp['task_id'],
                      {'question': '这些结果有什么局限？'})
-        self.assertIn('局限', ask2['answer'])
+        self.assertEqual(ask2['source'], 'unavailable')
 
     def test_task_list_exposes_task_type(self):
         resp = _post(self.base + '/api/analysis/clustering/tasks',

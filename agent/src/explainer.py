@@ -125,33 +125,6 @@ def summarize(result):
     return lines
 
 
-def dim_answer(result, dim):
-    """单维度追问的回答模板。"""
-    b = (result.get('before_score') or {}).get(dim)
-    a = (result.get('after_score') or {}).get(dim)
-    dc = (result.get('score_change') or {}).get(dim)
-    lines = ['%s维度：清洗前 %s%s。' % (
-        DIM_CN[dim], _fmt(b),
-        '' if a is None else '，清洗后 %s，%s' % (_fmt(a), _delta_text(dc)))]
-    method = ((result.get('report') or {}).get('method') or {})
-    if method.get('dimensions', {}).get(dim):
-        lines.append('该维度口径：' + method['dimensions'][dim])
-    related_p = [p for p in (result.get('problems') or []) if p['dimension'] == dim]
-    if related_p:
-        lines.append('该维度识别出的问题：%s。' % '；'.join(
-            '%s（%s，处置=%s，%d 条）' % (p['subject'],
-                                          SEVERITY_CN.get(p['severity'], p['severity']),
-                                          ACTION_CN.get(p['action'], p['action']),
-                                          p['count']) for p in related_p))
-    rel_u = [p for p in (result.get('unresolved_problems') or []) if p['dimension'] == dim]
-    if rel_u:
-        lines.append('该维度尚未解决：%s。' % '；'.join(
-            '%s（%d 条）' % (p['subject'], p['count']) for p in rel_u))
-    if dim == 'up_to_date':
-        note = ((result.get('score_details') or {}).get('up_to_date') or {}).get('note')
-        if note:
-            lines.append('特别说明：' + note)
-    return lines
 
 
 def failure_answer(record):
@@ -171,22 +144,6 @@ def failure_answer(record):
     return lines
 
 
-def version_answer(result):
-    st = result.get('statistics') or {}
-    lines = [
-        '数据版本：输入 %s；输出 %s。' % (result.get('input_version'),
-                                        result.get('output_version') or '（本任务未产出清洗数据）'),
-        '规则版本：%s（清洗与评分共用，定义于 hadoop/config/rules.json）。'
-        % result.get('rule_version'),
-        'T1=%s（epoch %s，训练期截止）；T2=%s（epoch %s，验证期截止）；'
-        '测试数据位于 T2 之后。划分规则：%s。'
-        % (result.get('T1'), result.get('T1_epoch'),
-           result.get('T2'), result.get('T2_epoch'), result.get('split_rule')),
-    ]
-    if st.get('isolated_count'):
-        lines.append('版本一致性提醒：被隔离记录未进入输出版本，保存在 '
-                     'hadoop/output/isolated/，不参与后续训练切分。')
-    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -219,277 +176,138 @@ _UID_RX = re.compile(r'(?:用户|user[_\s]*(?:id)?)[=：:\s]*(\d+)', re.I)
 _CLUSTER_RX = re.compile(r'(?:群体|簇|cluster)[\s=]*([0-9]+)', re.I)
 
 
-def _fmt_pct(v):
-    return 'null' if v is None else ('%.3f' % v)
+UNAVAILABLE_TEXT = (
+    '当前未配置可用的语言模型，无法回答追问。\n'
+    '请在仓库根 .env 中配置大模型（模板见 .env.example，配置项见 README'
+    '「大模型增强层」），重启 Agent 后即可追问。\n'
+    '任务结果本身不受影响，可直接查看 GET /api/tasks/{id}/result 的原始字段'
+    '（metrics / cluster_summaries / limitations 等）。'
+)
+
+LLM_FAILED_TEXT = (
+    '调用语言模型失败，无法回答追问。\n'
+    '具体原因见 Agent 日志中 [agent.llm] 开头的记录（鉴权 / 网络 / 限流 / 模型名）。\n'
+    '任务结果本身不受影响，可直接查看 GET /api/tasks/{id}/result 的原始字段。'
+)
 
 
-def analysis_summary_lines(result):
-    """分析任务通用摘要：每个算法一栏，数字全部取自结果信封。"""
-    lines = []
-    for e in result.get('results') or []:
-        mt = e.get('metrics') or {}
-        head = ('【%s】模型 %s / 结果 %s：拟合用户 %s 人'
-                % (e.get('algorithm_tool'), e.get('model_version'),
-                   e.get('result_version'), mt.get('n_fit_users')))
-        if e.get('algorithm') == 'kmeans':
-            head += '，选定 k=%s' % mt.get('k_selected')
-            if mt.get('silhouette_full') is not None:
-                head += ('，全量轮廓系数 %.4f，DBI %.3f，SSE %.0f'
-                         % (mt['silhouette_full'], mt['davies_bouldin_full'] or 0,
-                            mt['sse_full'] or 0))
-        elif e.get('algorithm') == 'dbscan':
-            head += ('，eps=%s（%s）/ min_samples=%s，簇数 %s，噪声 %s（占比 %s）'
-                     % (mt.get('eps_used'), mt.get('eps_method'),
-                        mt.get('min_samples'), mt.get('n_clusters'),
-                        mt.get('noise_count'),
-                        ('%.1f%%' % (100 * mt['noise_ratio']))
-                        if mt.get('noise_ratio') is not None else 'null'))
-        lines.append(head + '。')
-        for s in e.get('cluster_summaries') or []:
-            genres = '、'.join('%s %s' % (g['genre'], _fmt_pct(g['v']))
-                               for g in (s.get('top_genre_shares') or [])[:3])
-            reps = '、'.join('%s（%d 人高分）' % (m['title'], m['high_raters_in_cluster'])
-                             for m in (s.get('representative_movies') or [])[:3])
-            lines.append('  群体 %s：%s 人，均分 %s，高分占比 %s；类型Top: %s；'
-                         '代表作品: %s。'
-                         % (s.get('cluster_id'), s.get('size'),
-                            _fmt_pct(s.get('avg_rating_mean')),
-                            _fmt_pct(s.get('high_share_mean')), genres, reps))
-    if result.get('requested_user_ids'):
-        lines.append('本次请求用户：%s。' % result['requested_user_ids'])
-    return lines
+#: metrics 里的说明性长文本：对回答没有帮助，却会显著拉长 prompt
+_METRIC_PROSE_KEYS = ('definition', 'k_selection_rule', '_note')
+
+#: 每个群体保留几部代表作品（原数据是 5 部，回答里通常只引用前几部）
+_MAX_REP_MOVIES = 3
 
 
-def analysis_answer(record, question):
-    """迭代二分析任务追问：模板主路径，数字只取自结果信封。"""
-    q = (question or '').strip()
-    low = q.lower()
+def _slim_metrics(metrics):
+    """去掉 metrics 里的说明性长文本，只留数字与结构（显著减小 prompt）。"""
+    if not isinstance(metrics, dict):
+        return metrics
+    return {k: v for k, v in metrics.items() if k not in _METRIC_PROSE_KEYS}
+
+
+def _slim_summaries(summaries):
+    """压缩群体摘要：代表作品只留前 N 部，其余字段原样保留。"""
+    out = []
+    for c in summaries or []:
+        if not isinstance(c, dict):
+            continue
+        item = dict(c)
+        reps = item.get('representative_movies')
+        if isinstance(reps, list) and len(reps) > _MAX_REP_MOVIES:
+            item['representative_movies'] = reps[:_MAX_REP_MOVIES]
+            item['representative_movies_total'] = len(reps)
+        out.append(item)
+    return out
+
+
+def _analysis_evidence(record):
+    """
+    迭代二分析任务的只读证据摘录。
+
+    体积控制（重要）：assignments 只保留**本次请求涉及的**用户，
+    coordinates 只给总数与前 5 条样例 —— 否则 4783 个拟合用户的归属
+    会把上下文撑到几 MB，既慢又容易被截断。
+    """
     result = record.get('result') or {}
-    envs = result.get('results') or []
-    lines = []
-    matched = False
-
-    # ---- 版本/时间边界 ----
-    if ('版本' in q or 'version' in low or 't1' in low or 't2' in low
-            or '划分' in q or '时间' in q):
-        matched = True
-        lines.append('数据版本 %s；画像版本 %s；分析口径 %s；代码 commit %s。'
-                     % (result.get('data_version'), result.get('profile_version'),
-                        result.get('analysis_version'), result.get('code_version')))
-        lines.append('训练期截止 T1=%s（epoch %s），验证期截止 T2=%s（epoch %s）；'
-                     '画像特征只用 Timestamp<=T1 记录。'
-                     % (result.get('T1'), result.get('T1_epoch'),
-                        result.get('T2'), result.get('T2_epoch')))
-        rv = result.get('result_versions') or {}
-        if rv:
-            lines.append('结果版本：%s。'
-                         % '、'.join('%s=%s' % kv for kv in sorted(rv.items())))
-
-    # ---- 指定用户归属 ----
-    for uid in {int(m.group(1)) for m in _UID_RX.finditer(q)}:
-        hit = False
-        for e in envs:
-            a = next((x for x in e.get('assignments') or []
-                      if x.get('user_id') == uid), None)
-            if not a:
-                continue
-            hit = True
-            cid = a.get('cluster_id')
-            seg = ('【%s】用户 %s：' % (e.get('algorithm_tool'), uid))
-            if cid is None:
-                seg += '无归属（状态 %s）' % a.get('status')
-            else:
-                seg += '属于群体 %s（状态 %s%s）' % (
-                    cid, a.get('status'),
-                    '，可靠性低' if a.get('reliability_low') else '')
-                dist = a.get('distance_to_centroid')
-                if dist is not None:
-                    seg += '，到质心距离 %.3f' % dist
-            if a.get('note'):
-                seg += '。说明：' + a['note']
-            lines.append(seg + '。')
-            if cid is not None:
-                s = next((x for x in e.get('cluster_summaries') or []
-                          if x.get('cluster_id') == cid), None)
-                if s:
-                    lines.append('  该群体真实统计：%s 人，均分 %s，高分占比 %s。'
-                                 % (s.get('size'), _fmt_pct(s.get('avg_rating_mean')),
-                                    _fmt_pct(s.get('high_share_mean'))))
-        if not hit:
-            lines.append('结果中没有用户 %d 的归属记录（追问只基于已执行结果，'
-                         '不为未计算的用户编造结论）。' % uid)
-        matched = True
-
-    # ---- 指定群体 ----
-    for ck in {int(m.group(1)) for m in _CLUSTER_RX.finditer(q)}:
-        hit = False
-        for e in envs:
-            s = next((x for x in e.get('cluster_summaries') or []
-                      if x.get('cluster_id') == ck), None)
-            if not s:
-                continue
-            hit = True
-            genres = '、'.join('%s %s' % (g['genre'], _fmt_pct(g['v']))
-                               for g in (s.get('top_genre_shares') or []))
-            reps = '、'.join('%s（%d 人高分）'
-                            % (m['title'], m['high_raters_in_cluster'])
-                            for m in (s.get('representative_movies') or []))
-            lines.append('【%s】群体 %s：%s 人，平均评分 %s，'
-                         '高分占比 %s，活跃跨度均值 %s 天；类型占比：%s；代表作品：%s。'
-                         % (e.get('algorithm_tool'), ck, s.get('size'),
-                            _fmt_pct(s.get('avg_rating_mean')),
-                            _fmt_pct(s.get('high_share_mean')),
-                            _fmt_pct(s.get('active_span_days_mean')),
-                            genres or '—', reps or '—'))
-            lines.append('  依据：%s' % s.get('summary_basis'))
-        if not hit:
-            lines.append('群体 %d 不存在于当前结果（不同算法的簇号互不相通，'
-                         '请指明算法或以用户归属为准）。' % ck)
-        matched = True
-
-    # ---- 指标/噪声/参数选择 ----
-    if (any(k in low for k in ('指标', '轮廓', 'silhouette', 'dbi', 'davies', 'sse',
-                               '噪声', 'noise', 'eps', 'k选', '选k', '参数怎么选',
-                               'how many clusters')) or '指标' in q or '噪声' in q):
-        matched = True
-        for e in envs:
-            mt = e.get('metrics') or {}
-            parts = []
-            if e.get('algorithm') == 'kmeans':
-                parts = ['选定 k=%s' % mt.get('k_selected'),
-                         '全量轮廓系数 %s' % _fmt_pct(mt.get('silhouette_full')),
-                         'DBI %s' % _fmt_pct(mt.get('davies_bouldin_full')),
-                         'SSE %s' % (mt.get('sse_full') and round(mt['sse_full'], 1))]
-                tbl = mt.get('k_selection_table') or []
-                if tbl and ('k' in low or '选' in q or '轮廓' in q):
-                    parts.append('候选表：' + '；'.join(
-                        'k=%d sil≈%s' % (t['k'],
-                                          _fmt_pct(t['silhouette_sampled']))
-                        for t in tbl))
-            elif e.get('algorithm') == 'dbscan':
-                parts = ['eps=%s（%s）' % (mt.get('eps_used'), mt.get('eps_method')),
-                         'min_samples=%s' % mt.get('min_samples'),
-                         '簇数 %s' % mt.get('n_clusters'),
-                         '噪声 %s（%s）' % (mt.get('noise_count'),
-                                          _fmt_pct(mt.get('noise_ratio'))),
-                         '轮廓系数 %s' % _fmt_pct(mt.get('silhouette_full'))]
-            lines.append('【%s】%s。' % (e.get('algorithm_tool'), '，'.join(parts)))
-            defn = (mt.get('definition') or {}).get('silhouette')
-            if defn and '轮廓' in q:
-                lines.append('  口径：' + defn)
-
-    # ---- 参数 ----
-    if '参数' in q or 'parameter' in low:
-        matched = True
-        for e in envs:
-            lines.append('【%s】生效参数：%s。' % (e.get('algorithm_tool'),
-                                               e.get('parameters')))
-
-    # ---- 局限 ----
-    if any(k in q for k in ('局限', '不足', '风险', '为什么不能')):
-        matched = True
-        for e in envs:
-            lines.append('【%s】局限：' % e.get('algorithm_tool'))
-            lines.extend('  - ' + x for x in e.get('limitations') or [])
-
-    if not matched:
-        lines.extend(analysis_summary_lines(result))
-        source = 'template'
-        if llm.enabled():
-            ev = {'task_id': record.get('task_id'), 'status': record.get('status'),
-                  'algorithms': [{k: e.get(k) for k in
-                                  ('algorithm_tool', 'model_version',
-                                   'result_version', 'parameters', 'metrics',
-                                   'cluster_summaries', 'limitations')}
-                                 for e in envs]}
-            extra = llm.answer_question(q, ev)
-            if extra:
-                lines.append('以下补充回答由大模型基于上述真实结果证据生成：\n' + extra)
-                source = 'template+llm'
-        return '\n'.join(lines), source
-    return '\n'.join(lines), 'template'
+    wanted = set(result.get('requested_user_ids') or [])
+    algos = []
+    for e in result.get('results') or []:
+        item = {k: e.get(k) for k in (
+            'algorithm', 'algorithm_tool', 'algorithm_name', 'model_version',
+            'result_version', 'parameters', 'information_retention',
+            'resource_usage', 'clustering_comparison', 'limitations',
+            'original_dimensions', 'reduced_dimensions', 'axis_meaning')}
+        item['metrics'] = _slim_metrics(e.get('metrics'))
+        item['cluster_summaries'] = _slim_summaries(e.get('cluster_summaries'))
+        assigns = e.get('assignments') or []
+        if wanted:
+            item['assignments'] = [a for a in assigns
+                                   if a.get('user_id') in wanted]
+        else:
+            item['assignments'] = assigns[:50]
+            item['assignments_truncated'] = max(0, len(assigns) - 50)
+        coords = e.get('coordinates') or []
+        if coords:
+            item['coordinates_count'] = len(coords)
+            item['coordinates_sample'] = coords[:5]
+            item.pop('coordinates', None)
+        algos.append(item)
+    return {
+        'task_id': record.get('task_id'),
+        'task_type': result.get('task_type'),
+        'status': record.get('status'),
+        'data_version': result.get('data_version'),
+        'profile_version': result.get('profile_version'),
+        'analysis_version': result.get('analysis_version'),
+        'T1': result.get('T1'), 'T2': result.get('T2'),
+        'requested_user_ids': result.get('requested_user_ids'),
+        'result_versions': result.get('result_versions'),
+        'algorithms': algos,
+    }
 
 
 def answer(record, question):
     """
-    返回 (answer_text, source)。source ∈ template / llm / template+llm。
-    永远不抛异常：LLM 失败时静默回退模板。
+    返回 (answer_text, source)。
+
+    source ∈ state / llm / unavailable：
+      · state        任务未完成或已失败 —— 如实报告状态与失败环节（事实陈述）
+      · llm          大模型基于结果证据生成的回答
+      · unavailable  大模型不可用或调用失败 —— 明确说明，不退回模板
+
+    模板答案已按团队决定移除：语言表达一律交给大模型。
+    模型不可用时**如实说明不可用**，绝不用规则拼一段看似完整的答案顶替
+    （引言 §5：不得使用模拟结果替代）。
     """
     q = (question or '').strip()
     status = record.get('status')
-
-    # ---- 迭代二：分析任务按 task_type 分发到专用模板 ----
     task_type = record.get('task_type') or record.get('plan', {}).get('task_type')
-    if task_type in _ANALYSIS_TYPES:
-        if status == FAILED:
-            return '\n'.join(failure_answer(record)), 'template'
-        if status in (PENDING, RUNNING):
-            stage = record.get('stage')
-            notes = record.get('plan', {}).get('notes') or ''
+    is_analysis = task_type in _ANALYSIS_TYPES
+
+    # ---- 1) 非终态：状态报告（事实陈述，不需要模型）----
+    if status in (PENDING, RUNNING):
+        stage = record.get('stage')
+        if is_analysis:
             text = ('分析任务尚未完成（状态 %s，环节：%s）。聚类拟合可能需要数分钟。'
                     % (status, stage or '排队中'))
-            if notes:
-                text += '\nAgent 对本需求的理解：' + (
-                    ' '.join(notes) if isinstance(notes, list) else notes)
-            return text, 'template'
-        return analysis_answer(record, q)
+        else:
+            text = ('任务尚未完成（当前状态 %s，环节：%s）。完成后即可追问结果。'
+                    % (status, stage or '排队中'))
+        notes = record.get('plan', {}).get('notes') or ''
+        if notes:
+            text += '\nAgent 对本需求的理解：' + (
+                ' '.join(notes) if isinstance(notes, list) else notes)
+        return text, 'state'
 
+    # ---- 2) 失败任务：如实报告失败环节与原因（事实陈述）----
     if status == FAILED:
-        return '\n'.join(failure_answer(record)), 'template'
-    if status in (PENDING, RUNNING):
-        from models import STAGE_MESSAGES
-        stage = record.get('stage')
-        text = ('任务尚未完成（当前状态 %s，环节：%s）。'
-                '完成后即可追问评分与清洗结果。' % (status, stage or '排队中'))
-        if record.get('plan', {}).get('notes'):
-            text += '\nAgent 对本需求的理解：' + ' '.join(record['plan']['notes'])
-        return text, 'template'
+        return '\n'.join(failure_answer(record)), 'state'
 
-    result = record.get('result') or {}
-    lines = []
-
-    # ---- 关键词路由（可多个命中，全部作答）----
-    matched = False
-    dims = parser_mod.detect_dimensions(q)
-    if dims:
-        matched = True
-        for d in dims:
-            lines.extend(dim_answer(result, d))
-    low = q.lower()
-    if '隔离' in q or ('移除' in q and not matched):
-        matched = True
-        st = result.get('statistics') or {}
-        lines.append('隔离：%s 条记录因无法确定正确值被移出主数据集，单独保存在 '
-                     'hadoop/output/isolated/；它们未被修正，因此不能表述为"已修复"。'
-                     '修复（fixed）%s 条才是真正改回正确值的记录。'
-                     % (st.get('isolated_count'), st.get('fixed_count')))
-    if ('版本' in q or 'T1' in q or 'T2' in q or 't1' in low or 't2' in low
-            or '划分' in q or '切分' in q):
-        matched = True
-        lines.extend(version_answer(result))
-    if '权重' in q:
-        matched = True
-        w = (result.get('report', {}).get('method', {}).get('weights')
-             or result.get('weights') or {})
-        lines.append('综合分权重：%s。%s'
-                     % ('、'.join('%s %s' % (DIM_CN.get(k, k), v)
-                                  for k, v in sorted(w.items())),
-                        '权重是设计选择而非测量结果（见 evaluation-method 第 5.1 节）。'))
-    if ('不足' in q or '局限' in q or '无法验证' in q or '不能确定' in q):
-        matched = True
-        lims = (result.get('report') or {}).get('limitations') or []
-        lines.append('评价局限（无法验证的方面）：'
-                     + '；'.join(x.get('topic', '') for x in lims) + '。')
-    if not matched:
-        # 无明确路由：先给通用摘要，再让 LLM 在证据约束下补充回答
-        lines.extend(summarize(result))
-        lines.append('（当前问题未命中已登记的解释模板，以上为任务摘要。）')
-        source = 'template'
-        if llm.enabled():
-            extra = llm.answer_question(q, build_evidence(record))
-            if extra:
-                lines.append('以下补充回答由大模型基于上述真实结果证据生成：\n' + extra)
-                source = 'template+llm'
-        return '\n'.join(lines), source
-
-    return '\n'.join(lines), 'template'
+    # ---- 3) 终态：语言表达交给大模型 ----
+    if not llm.enabled():
+        return UNAVAILABLE_TEXT, 'unavailable'
+    evidence = _analysis_evidence(record) if is_analysis else build_evidence(record)
+    text = llm.answer_question(q, evidence, max_tokens=1024)
+    if not text:
+        return LLM_FAILED_TEXT, 'unavailable'
+    return text, 'llm'

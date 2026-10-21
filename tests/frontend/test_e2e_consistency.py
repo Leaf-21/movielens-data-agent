@@ -41,6 +41,11 @@ for p in (os.path.join(_REPO, 'agent', 'src'),
     if p not in sys.path:
         sys.path.insert(0, p)
 
+# 端到端一致性测试同样不访问真实大模型：追问已改为模型主路径，
+# 不关闭会因真实网络延迟（十几秒）超过本测试 10 秒的 HTTP 超时。
+import os as _os
+_os.environ['ML_LLM_DISABLE'] = '1'
+
 import api                      # noqa: E402  agent/src
 import serve as frontend_serve  # noqa: E402  frontend/src
 import hadoop_tool              # noqa: E402
@@ -218,9 +223,10 @@ class TestE2EConsistency(unittest.TestCase):
         tid, _ = self._run_task()
         resp = _post_json(self.front_base + '/api/tasks/%s/ask' % tid,
                           {'question': '被隔离的记录算修复了吗'})
-        self.assertEqual(resp['source'], 'template')
-        self.assertIn('answer', resp)
-        self.assertTrue(resp['answer'])
+        # 追问已改为大模型主路径；本测试禁用了模型，故应如实报「不可用」，
+        # 而不是退回模板拼答案。
+        self.assertEqual(resp['source'], 'unavailable')
+        self.assertIn('未配置可用的语言模型', resp['answer'])
 
     def test_no_numbers_before_completion(self):
         """任务未完成时前端出口不得返回任何数值（接口规范第 2.2 节）。"""
