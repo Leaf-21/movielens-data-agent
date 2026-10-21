@@ -9,6 +9,8 @@ data/ml-1m/
 # ===== 敏感信息（严禁上传）=====
 .env
 .env.*
+# 模板必须入库，否则新人不知道要配哪些项
+!.env.example
 *.key
 *.pem
 credentials.*

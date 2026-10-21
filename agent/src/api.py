@@ -40,6 +40,11 @@ for _p in (_TOOLS_DIR, os.path.join(_TOOLS_DIR, 'clustering')):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+# 在导入 config 之前加载 .env：config 在模块级读取 ML_AGENT_HOST/PORT 等，
+# 晚于导入再加载就来不及了。.env 缺失时静默跳过（可选能力）。
+import dotenv                # noqa: E402
+dotenv.load()
+
 import config                # noqa: E402
 import models                # noqa: E402
 import parser as req_parser  # noqa: E402
@@ -326,6 +331,7 @@ class Handler(BaseHTTPRequestHandler):
             'hadoop_url': G['tool'].base_url,
             'rule_version': cfg.get('rule_version') if cfg else None,
             'llm_enabled': bool(explainer.llm.enabled()),
+            'llm': explainer.llm.diagnose(),
             'analysis': analysis,
             'scheduler': {'queue_size': G['scheduler'].q.qsize(),
                           'pending': G['store'].pending_ids()},

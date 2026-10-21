@@ -1,0 +1,8 @@
+# 可选依赖：大模型增强层（不装也能跑，追问走确定性模板路径）
+#
+#   python3 -m pip install -r requirements-llm.txt
+#
+# 装好后在仓库根创建 .env（模板见 .env.example）并填入 ANTHROPIC_API_KEY，
+# 重启 Agent 即生效；GET /health 的 llm_enabled 会变成 true。
+
+anthropic>=0.40

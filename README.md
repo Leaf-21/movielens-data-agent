@@ -198,7 +198,9 @@ movielens-data-agent/
   `python3 -m pip install -r requirements.txt` 即可；不安装不影响迭代一三件套的运行。
   装好后可用 `bash check_env.sh` 自检（会分别验证普通模式与 `-I` 隔离模式下能否 import numpy）；
 - **清洗任务额外需要**：WSL（Ubuntu）或 Linux 环境 + Hadoop 3.4.1 + JDK（8/11/17 均可）。只评估（不清洗）的任务无需 Hadoop；
-- 前端渲染测试可选装 Node（`tests/run_all.py` 会自动检测，无 Node 时跳过该块）。
+- 前端渲染测试可选装 Node（`tests/run_all.py` 会自动检测，无 Node 时跳过该块）；
+- **大模型增强层（可选）**：`python3 -m pip install -r requirements-llm.txt`（仅 `anthropic` 一个包），
+  再按下一节配置 `.env`。不装不影响任何功能，追问走确定性模板。
 
 > **依赖可见性说明**：分析工具按契约以 `python3 -I` 在子进程中运行（隔离模式）。`-I` 隐含 `-s`，**不含用户级
 > site-packages**；调度器已自动把用户级目录补回子进程的 `sys.path`，所以 `pip install --user` 装的 numpy 也能用。
@@ -235,6 +237,88 @@ python3 frontend/src/serve.py --port 8000 --agent-url http://127.0.0.1:8090 &
 > `JAVA_HOME` / `HADOOP_HOME` 写在 `~/.bashrc` 中，**只对交互式 shell 生效**。用脚本或非交互方式启动 8080 时必须显式 `export`，否则清洗任务会报 `HADOOP_EXECUTION_ERROR: 找不到 Hadoop Streaming JAR`。
 
 WSL 一键脚本（成员C提供）：`scripts_setup/install_hadoop.sh` → `sync_to_wsl.sh` → `start_all_wsl.sh`，停止用 `stop_all_wsl.sh`；注意脚本内路径按执行机环境可能需微调。演示口令与预期输出口径见 `docs/迭代一/交付文档/演示脚本.md`。
+
+### 大模型增强层（可选）
+
+系统默认走**确定性模板**路径回答追问，不依赖任何外部服务。配置大模型后，
+模板未命中的问题会追加一段由模型生成、且被强制只引用真实结果的解释。
+
+**为什么是"可选增强"而不是主路径**：项目纪律要求"不得编造结果"，
+LLM 一旦不可用（未装包 / 无凭据 / 网络不通 / 限流）就必须能无感降级，
+所以模板是主路径，模型只做补充。四条红线写在 `agent/src/llm.py` 头部：
+
+1. 只用于【理解用户表述】和【解释已真实执行的结果】，绝不生成或修改任何评分、条数、版本、时间边界；
+2. 传给模型的是结果 JSON 的**只读摘录** + 强制"只引用给定数字"的系统提示；
+3. 任何失败一律返回 `None`，调用方回退模板；
+4. Prompt 全文公开在 `agent/config/prompts/`，便于评审。
+
+#### 配置步骤
+
+```bash
+# ① 装依赖（仅一个包）
+python3 -m pip install -r requirements-llm.txt
+
+# ② 复制模板并填入你自己的密钥
+cp .env.example .env
+#   编辑 .env，在 ANTHROPIC_API_KEY= 右边填上密钥
+
+# ③ 重启 Agent（.env 在进程启动时加载）
+python3 agent/src/api.py --port 8090
+```
+
+`.env` 已被 `.gitignore` 排除，**不会进仓库**；`.env.example` 是不含真实密钥的模板。
+
+#### 可配置项
+
+| 变量 | 作用 | 默认 |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | 凭据（与下一项二选一） | 无 |
+| `ANTHROPIC_AUTH_TOKEN` | 凭据（替代 API Key） | 无 |
+| `ANTHROPIC_BASE_URL` | 走代理 / 中转 / 自建网关时的接口地址 | 官方地址 |
+| `ML_LLM_MODEL` | 模型名 | `claude-opus-5` |
+| `ML_LLM_TIMEOUT` | 单次调用超时（秒） | `60` |
+| `ML_LLM_MAX_RETRIES` | SDK 层重试次数 | `1` |
+| `ML_LLM_DISABLE` | 设为 `1` 可强制关闭（即使配了凭据） | 未设 |
+
+**优先级：真实环境变量 > `.env` > 代码默认值。** 所以 `export ANTHROPIC_API_KEY=...`
+永远会覆盖 `.env` 里的值，便于临时切换或多环境调试。`.env` 中的空值视为"未配置"，不会注入。
+
+#### 怎么确认接好了
+
+```bash
+curl -s localhost:8090/health | python3 -m json.tool | sed -n '/"llm"/,/}/p'
+```
+
+会看到 `llm` 诊断块（**只暴露"有没有"，不回显密钥**）：
+
+```json
+"llm": {
+  "enabled": true,
+  "sdk_installed": true,
+  "sdk_error": null,
+  "credential_var": "ANTHROPIC_API_KEY",
+  "credential_masked": "sk-ant***7890",
+  "model": "claude-opus-5",
+  "base_url_set": false,
+  "timeout_s": 60.0,
+  "env_file_keys": ["ANTHROPIC_API_KEY"]
+}
+```
+
+`llm_enabled: true` 且追问返回的 `source` 为 `template+llm`，说明已在用模型。
+
+若 `enabled` 仍为 `false`，按下面顺序排查：
+
+| 现象 | 原因 | 处置 |
+| --- | --- | --- |
+| `sdk_installed: false` | 没装 anthropic | `pip install -r requirements-llm.txt` |
+| `credential_var: null` | 没读到密钥 | 检查 `.env` 是否在仓库根、键名是否拼错 |
+| `env_file_keys: []` | `.env` 未生效 | 确认值非空；或改用 `export` 注入 |
+| `enabled: true` 但 `source` 仍是 `template` | 问题命中了模板，本就不调用模型 | 正常行为 |
+| 日志出现 `调用失败，回退到模板路径` | 鉴权 / 网络 / 限流 | 检查密钥与 `ANTHROPIC_BASE_URL` |
+
+> 模板未命中时才调用模型（`explainer.py` 里 `if not matched` 分支），
+> 所以大部分标准问法（归属、群体特征、指标、参数、局限、版本）根本不会产生 API 调用。
 
 ### 验证与测试
 
