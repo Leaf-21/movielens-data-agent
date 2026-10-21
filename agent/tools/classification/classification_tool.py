@@ -147,6 +147,9 @@ def run(payload, acfg=None, rcfg=None):
         'result_version': _result_version(item.get('model_version'), result['target'], item),
         'parameters': meta.get('parameters') or {},
         'data_version': result.get('data_version'),
+        # 分类特征（feat-v1）不用画像工件，此字段是 runner 信封契约的必需键；
+        # 调度器会透传 plan 里的画像版本，直接命令行运行时回落到默认版本。
+        'profile_version': payload.get('profile_version') or 'profile-v1',
         'cleaning_rule_version': result.get('cleaning_rule_version'),
         'feature_version': result.get('feature_version'),
         'split_version': result.get('split_version'),

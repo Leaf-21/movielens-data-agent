@@ -32,7 +32,8 @@ class TestRegistry(unittest.TestCase):
     def test_algorithm_names_single_source(self):
         self.assertEqual(registry.algorithm_names('clustering'),
                          ['dbscan', 'kmeans'])
-        self.assertEqual(registry.algorithm_names('classification'), [])
+        self.assertEqual(registry.algorithm_names('classification'),
+                         ['cart', 'gnb'])
         self.assertEqual(registry.algorithm_names('dimensionality_reduction'),
                          ['pca', 'tsne'])
 
@@ -41,6 +42,7 @@ class TestRegistry(unittest.TestCase):
                          'clustering_kmeans')
         self.assertEqual(registry.implemented_tools(),
                          ['clustering_dbscan', 'clustering_kmeans',
+                          'classification_cart', 'classification_gnb',
                           'dimensionality_reduction_pca',
                           'dimensionality_reduction_tsne'])
 
@@ -108,11 +110,22 @@ class TestRouter(unittest.TestCase):
             self._route('clustering', {'user_ids': [1], 'algorithm': 'hdbscan'})
         self.assertEqual(cm.exception.code, 'MODEL_NOT_FOUND')
 
-    def test_classification_not_implemented(self):
+    def test_classification_requires_movie_id(self):
+        # 分类已登记（gnb/cart）；缺 movie_id 是请求不完整，不是“类别尚未实现”。
         with self.assertRaises(AnalysisError) as cm:
             self._route('classification',
                         {'query': '预测用户 1 是否会喜欢电影', 'user_ids': [1]})
-        self.assertEqual(cm.exception.code, 'MODEL_NOT_FOUND')
+        self.assertEqual(cm.exception.code, 'INVALID_REQUEST')
+        self.assertIn('movie_id', cm.exception.message)
+
+    def test_classification_plan_with_target(self):
+        plan = self._route('classification',
+                           {'query': '预测用户 1 是否喜欢电影 260',
+                            'user_ids': [1], 'movie_id': 260})
+        self.assertEqual(plan['task_type'], 'classification')
+        self.assertEqual(plan['algorithms'], ['cart', 'gnb'])
+        self.assertEqual(plan['classification_target'],
+                         {'user_id': 1, 'movie_id': 260})
 
     def test_no_users_invalid_request(self):
         with self.assertRaises(AnalysisError) as cm:

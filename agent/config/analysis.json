@@ -62,8 +62,23 @@
       }
     },
     "classification": {
-      "_note": "成员A的两个分类工具尚未合入。登记位保持为空，registry 在调用时返回 MODEL_NOT_FOUND；A 的工具落位到 agent/tools/classification/ 后按同名约定自动生效。",
-      "algorithms": {}
+      "_note": "一个工具文件 agent/tools/classification/classification_tool.py 按 payload.algorithm 区分算法；条目直接挂在本节点下（与 clustering 同构），runner 逐算法各调用一次。",
+      "gnb": {
+        "module": "classification.classification_tool",
+        "entry": "run",
+        "parameters": {},
+        "algorithm_source": "课程课件 26Fall-008-分类1010+1014.pdf 第 25–36 页（朴素贝叶斯）",
+        "selection_rule": "高斯朴素贝叶斯；决策阈值在验证期按“预测正类比例不超过真实正类比例 1.10 倍”的约束下最大化 F1 选定",
+        "timeout_s": 300
+      },
+      "cart": {
+        "module": "classification.classification_tool",
+        "entry": "run",
+        "parameters": {},
+        "algorithm_source": "课程课件 26Fall-008-分类1010+1014.pdf 第 38–61 页（决策树，信息增益）",
+        "selection_rule": "信息增益决策树（max_depth=12、min_samples_leaf=100 由验证期选定）；阈值口径与 gnb 相同",
+        "timeout_s": 300
+      }
     },
     "dimensionality_reduction": {
       "pca": {

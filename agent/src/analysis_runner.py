@@ -160,6 +160,24 @@ def _profile_stage(store, task_id):
     raise AnalysisError('DATA_UNAVAILABLE', last_err)
 
 
+def tool_payload(category, plan, algo):
+    """runner -> 工具的统一 payload（分类额外注入算法名与预测目标）。
+
+    分类工具是一个文件服务 gnb/cart 两个登记条目，子进程里拿不到 entry，
+    必须由 payload 显式告知跑哪个算法（缺了它工具会返回 INVALID_PARAMETER）。
+    """
+    payload = {
+        'user_ids': plan['user_ids'],
+        'parameters': plan['parameters_by_algorithm'].get(algo, {}),
+        'data_version': plan['data_version'],
+        'profile_version': plan['profile_version'],
+    }
+    if category == 'classification':
+        payload.update(plan.get('classification_target') or {})
+        payload['algorithm'] = algo
+    return payload
+
+
 def run_task(store, task_id, results_dir):
     """
     执行一个分析任务（由调度线程按 task_type 分发进来）。
@@ -188,14 +206,7 @@ def run_task(store, task_id, results_dir):
                      message=models.STAGE_MESSAGES[models.CLUSTER_FIT])
         for algo in plan['algorithms']:
             entry = registry.require(category, algo, acfg)
-            payload = {
-                'user_ids': plan['user_ids'],
-                'parameters': plan['parameters_by_algorithm'].get(algo, {}),
-                'data_version': plan['data_version'],
-                'profile_version': plan['profile_version'],
-            }
-            if category == 'classification':
-                payload.update(plan['classification_target'])
+            payload = tool_payload(category, plan, algo)
             results.append(_run_tool_subprocess(entry, algo, task_id, payload,
                                                 log_lines, category=category))
 
