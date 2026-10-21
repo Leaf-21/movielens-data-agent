@@ -199,8 +199,9 @@ movielens-data-agent/
   装好后可用 `bash check_env.sh` 自检（会分别验证普通模式与 `-I` 隔离模式下能否 import numpy）；
 - **清洗任务额外需要**：WSL（Ubuntu）或 Linux 环境 + Hadoop 3.4.1 + JDK（8/11/17 均可）。只评估（不清洗）的任务无需 Hadoop；
 - 前端渲染测试可选装 Node（`tests/run_all.py` 会自动检测，无 Node 时跳过该块）；
-- **大模型增强层（可选）**：`python3 -m pip install -r requirements-llm.txt`（仅 `anthropic` 一个包），
-  再按下一节配置 `.env`。不装不影响任何功能，追问走确定性模板。
+- **大模型增强层（可选，零依赖）**：只用标准库 HTTP，不需要装任何包，配置 `.env` 即可，
+  支持 Anthropic 与所有 OpenAI 兼容服务（DeepSeek / 通义千问 / Moonshot / 智谱 / Ollama 等），
+  详见下一节。不配置不影响任何功能，追问走确定性模板。
 
 > **依赖可见性说明**：分析工具按契约以 `python3 -I` 在子进程中运行（隔离模式）。`-I` 隐含 `-s`，**不含用户级
 > site-packages**；调度器已自动把用户级目录补回子进程的 `sys.path`，所以 `pip install --user` 装的 numpy 也能用。
@@ -238,13 +239,13 @@ python3 frontend/src/serve.py --port 8000 --agent-url http://127.0.0.1:8090 &
 
 WSL 一键脚本（成员C提供）：`scripts_setup/install_hadoop.sh` → `sync_to_wsl.sh` → `start_all_wsl.sh`，停止用 `stop_all_wsl.sh`；注意脚本内路径按执行机环境可能需微调。演示口令与预期输出口径见 `docs/迭代一/交付文档/演示脚本.md`。
 
-### 大模型增强层（可选）
+### 大模型增强层（可选，多服务商）
 
 系统默认走**确定性模板**路径回答追问，不依赖任何外部服务。配置大模型后，
 模板未命中的问题会追加一段由模型生成、且被强制只引用真实结果的解释。
 
 **为什么是"可选增强"而不是主路径**：项目纪律要求"不得编造结果"，
-LLM 一旦不可用（未装包 / 无凭据 / 网络不通 / 限流）就必须能无感降级，
+LLM 一旦不可用（未配置 / 网络不通 / 限流 / 鉴权失败）就必须能无感降级，
 所以模板是主路径，模型只做补充。四条红线写在 `agent/src/llm.py` 头部：
 
 1. 只用于【理解用户表述】和【解释已真实执行的结果】，绝不生成或修改任何评分、条数、版本、时间边界；
@@ -252,41 +253,73 @@ LLM 一旦不可用（未装包 / 无凭据 / 网络不通 / 限流）就必须�
 3. 任何失败一律返回 `None`，调用方回退模板；
 4. Prompt 全文公开在 `agent/config/prompts/`，便于评审。
 
+#### 支持的服务商
+
+实现上只有两种协议，都用标准库 `urllib` 发请求，**不依赖任何第三方包**：
+
+| 协议 | 接口 | 覆盖 |
+| --- | --- | --- |
+| `anthropic` | `POST {base}/v1/messages` | Anthropic Claude（官方或中转） |
+| `openai` | `POST {base}/chat/completions` | OpenAI、DeepSeek、通义千问（DashScope 兼容模式）、Moonshot、智谱 GLM、SiliconFlow、火山方舟、Ollama / vLLM / OneAPI 等自建网关 |
+
+内置服务商预设（`ML_LLM_PROVIDER` 可选值）及其默认地址：
+
+| 值 | 默认 base_url | 默认模型 |
+| --- | --- | --- |
+| `anthropic` | `https://api.anthropic.com` | `claude-opus-5` |
+| `openai` | `https://api.openai.com/v1` | `gpt-4o-mini` |
+| `deepseek` | `https://api.deepseek.com/v1` | `deepseek-chat` |
+| `qwen` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
+| `moonshot` | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` |
+| `zhipu` | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-plus` |
+| `ollama` | `http://127.0.0.1:11434/v1` | `qwen2.5`（本地，无需密钥） |
+
+> 默认模型名可能随服务商调整而过时，**建议显式设置 `ML_LLM_MODEL`** 为你账号可用的模型。
+> 不在表里的 OpenAI 兼容服务，用 `ML_LLM_PROVIDER=openai` + 自定义 `ML_LLM_BASE_URL` 即可接入。
+
 #### 配置步骤
 
 ```bash
-# ① 装依赖（仅一个包）
-python3 -m pip install -r requirements-llm.txt
-
-# ② 复制模板并填入你自己的密钥
+# ① 复制模板
 cp .env.example .env
-#   编辑 .env，在 ANTHROPIC_API_KEY= 右边填上密钥
+
+# ② 编辑 .env，填三行（以 DeepSeek 为例）
+#    ML_LLM_PROVIDER=deepseek
+#    ML_LLM_API_KEY=sk-你的密钥
+#    ML_LLM_MODEL=deepseek-chat
 
 # ③ 重启 Agent（.env 在进程启动时加载）
-python3 agent/src/api.py --port 8090
+python3 agent/src/api.py --port 8090 --hadoop-url http://127.0.0.1:8080
 ```
 
-`.env` 已被 `.gitignore` 排除，**不会进仓库**；`.env.example` 是不含真实密钥的模板。
+`.env` 已被 `.gitignore` 排除，**不会进仓库**；`.env.example` 是不含真实密钥的模板，
+里面列了七种服务商的完整示例，复制对应一组即可。
+
+**最省事的写法**：只填统一变量 `ML_LLM_API_KEY`，代码会按密钥自动推断服务商
+（`ANTHROPIC_*` → anthropic，其余 → openai）。
 
 #### 可配置项
 
 | 变量 | 作用 | 默认 |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | 凭据（与下一项二选一） | 无 |
-| `ANTHROPIC_AUTH_TOKEN` | 凭据（替代 API Key） | 无 |
-| `ANTHROPIC_BASE_URL` | 走代理 / 中转 / 自建网关时的接口地址 | 官方地址 |
-| `ML_LLM_MODEL` | 模型名 | `claude-opus-5` |
+| `ML_LLM_PROVIDER` | 服务商，见上表；不填则按凭据自动判断 | 自动 |
+| `ML_LLM_API_KEY` | 统一凭据（优先于各家专用变量） | 无 |
+| `ML_LLM_BASE_URL` | 接口地址（走代理/自建网关时用） | 按服务商 |
+| `ML_LLM_MODEL` | 模型名 | 按服务商 |
 | `ML_LLM_TIMEOUT` | 单次调用超时（秒） | `60` |
-| `ML_LLM_MAX_RETRIES` | SDK 层重试次数 | `1` |
-| `ML_LLM_DISABLE` | 设为 `1` 可强制关闭（即使配了凭据） | 未设 |
+| `ML_LLM_MAX_RETRIES` | 网络类失败的重试次数（4xx 不重试） | `1` |
+| `ML_LLM_TEMPERATURE` | 采样温度；**不设则不下发该字段**（兼容推理型模型） | 未设 |
+| `ML_LLM_DISABLE` | 设为 `1` 强制关闭（即使配了凭据） | 未设 |
 
-**优先级：真实环境变量 > `.env` > 代码默认值。** 所以 `export ANTHROPIC_API_KEY=...`
-永远会覆盖 `.env` 里的值，便于临时切换或多环境调试。`.env` 中的空值视为"未配置"，不会注入。
+**兼容旧变量**：`ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_BASE_URL` / `OPENAI_API_KEY`。
+
+**优先级：真实环境变量 > `.env` > 代码默认值。** 所以 `export ML_LLM_API_KEY=...`
+永远覆盖 `.env`，便于临时切换或多环境调试。`.env` 中的空值视为"未配置"，不会注入。
 
 #### 怎么确认接好了
 
 ```bash
-curl -s localhost:8090/health | python3 -m json.tool | sed -n '/"llm"/,/}/p'
+curl -s localhost:8090/health | python3 -m json.tool | sed -n '/"llm"/,/^    }/p'
 ```
 
 会看到 `llm` 诊断块（**只暴露"有没有"，不回显密钥**）：
@@ -294,28 +327,34 @@ curl -s localhost:8090/health | python3 -m json.tool | sed -n '/"llm"/,/}/p'
 ```json
 "llm": {
   "enabled": true,
-  "sdk_installed": true,
-  "sdk_error": null,
-  "credential_var": "ANTHROPIC_API_KEY",
-  "credential_masked": "sk-ant***7890",
-  "model": "claude-opus-5",
-  "base_url_set": false,
+  "disabled_by_flag": false,
+  "supported_providers": ["anthropic", "deepseek", "moonshot", "ollama",
+                          "openai", "qwen", "zhipu"],
+  "env_file_keys": ["ML_LLM_PROVIDER", "ML_LLM_API_KEY", "ML_LLM_MODEL"],
+  "provider": "deepseek",
+  "protocol": "openai",
+  "model": "deepseek-chat",
+  "base_url_host": "api.deepseek.com",
+  "credential_var": "ML_LLM_API_KEY",
+  "credential_masked": "sk-xxx***abcd",
   "timeout_s": 60.0,
-  "env_file_keys": ["ANTHROPIC_API_KEY"]
+  "max_retries": 1,
+  "temperature": null
 }
 ```
 
 `llm_enabled: true` 且追问返回的 `source` 为 `template+llm`，说明已在用模型。
 
-若 `enabled` 仍为 `false`，按下面顺序排查：
+若 `enabled` 为 `false`，按 `reason` 字段排查：
 
-| 现象 | 原因 | 处置 |
+| `reason` / 现象 | 原因 | 处置 |
 | --- | --- | --- |
-| `sdk_installed: false` | 没装 anthropic | `pip install -r requirements-llm.txt` |
-| `credential_var: null` | 没读到密钥 | 检查 `.env` 是否在仓库根、键名是否拼错 |
-| `env_file_keys: []` | `.env` 未生效 | 确认值非空；或改用 `export` 注入 |
+| `未配置任何凭据` | 没读到密钥 | 检查 `.env` 是否在仓库根、键名是否拼错、值是否为空 |
+| `未知服务商 'xxx'` | `ML_LLM_PROVIDER` 拼错 | 改为上表中的值，或留空让其自动判断 |
+| `ML_LLM_DISABLE 已开启` | 显式关了 | 去掉该变量或设为 `0` |
+| `env_file_keys` 为空 | `.env` 未被加载 | 确认文件名是 `.env` 且在仓库根；或用 `export` 注入 |
 | `enabled: true` 但 `source` 仍是 `template` | 问题命中了模板，本就不调用模型 | 正常行为 |
-| 日志出现 `调用失败，回退到模板路径` | 鉴权 / 网络 / 限流 | 检查密钥与 `ANTHROPIC_BASE_URL` |
+| 日志出现 `调用失败（provider），回退到模板路径` | 鉴权 / 网络 / 限流 / 模型名错 | 按日志里的 HTTP 码排查；`401` 多为密钥错，`404` 多为 base_url 或模型名错 |
 
 > 模板未命中时才调用模型（`explainer.py` 里 `if not matched` 分支），
 > 所以大部分标准问法（归属、群体特征、指标、参数、局限、版本）根本不会产生 API 调用。
