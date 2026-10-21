@@ -70,7 +70,10 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get('Content-Length') or 0)
         body = self.rfile.read(length) if length else None
 
-        conn = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=30)
+        # 追问已改为大模型主路径，单次可能 10~60 秒；
+        # 30 秒会把正常调用误判成“无法连接 Agent”。
+        conn = http.client.HTTPConnection(parsed.hostname, parsed.port,
+                                          timeout=180)
         headers = {'Content-Type': self.headers.get('Content-Type',
                                                      'application/json')}
         try:
