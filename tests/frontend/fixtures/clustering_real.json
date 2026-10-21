@@ -1,0 +1,520 @@
+{
+ "task_id": "task_20261020_0026",
+ "task_type": "clustering",
+ "status": "SUCCESS",
+ "analysis_version": "iter2-analysis-v1",
+ "data_version": "movielens-1m-v2-clean-v1",
+ "profile_version": "profile-v1",
+ "T1": "2000-11-22",
+ "T2": "2000-12-10",
+ "T1_epoch": 974862386,
+ "T2_epoch": 976422054,
+ "requested_user_ids": [
+  1161,
+  1162,
+  1163,
+  1164,
+  1166,
+  1167,
+  1168,
+  1169,
+  1170,
+  1171
+ ],
+ "result_versions": {
+  "clustering_kmeans": "res-915e5aa421f1"
+ },
+ "code_version": "3c7c210",
+ "understanding": "算法由请求字段指定（query 未提及）；目标用户来自请求字段（query 未含用户 ID）",
+ "execution": {
+  "mode": "subprocess_isolated",
+  "total_wall_ms": 44266,
+  "log": [
+   "kmeans 第1次尝试成功(43917ms)"
+  ]
+ },
+ "created_at": "2026-10-20T15:51:35Z",
+ "_assembled_by": "agent/analysis(成员B)",
+ "results": [
+  {
+   "algorithm": "kmeans",
+   "algorithm_tool": "clustering_kmeans",
+   "model_version": "mdl-a18e5c6560",
+   "result_version": "res-915e5aa421f1",
+   "parameters": {
+    "k_candidates": [
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ],
+    "seed": 42,
+    "max_iter": 100,
+    "tol": 1e-06,
+    "init": "kmeans++",
+    "silhouette_sample_size": 800,
+    "timeout_s": 600
+   },
+   "data_version": "movielens-1m-v2-clean-v1",
+   "profile_version": "profile-v1",
+   "T1": "2000-11-22",
+   "T2": "2000-12-10",
+   "code_version": "3c7c210",
+   "created_at": "2026-10-20T15:52:19Z",
+   "fit_scope": {
+    "population": "profile-v1 中 status=OK 的训练期画像用户",
+    "n_fit_users": 4783,
+    "centroid_dim": 27
+   },
+   "centroids": [
+    [
+     -0.2522125365457386,
+     0.1187428470296897,
+     -0.06605631301292765,
+     0.11874284702969233,
+     0.10004322726520366,
+     0.7594838222745997,
+     0.7302092057963615,
+     -0.2342439418988071,
+     -0.15364192886362027,
+     1.393938763220789,
+     1.3008516392007605,
+     -0.10494244505727882,
+     -0.004387552748997278,
+     -0.6298525913336509,
+     -0.05620945408073126,
+     -0.22525924426295885,
+     -0.7001546311629075,
+     0.7265317639851486,
+     -0.14820995792351885,
+     0.03428849685244784,
+     -0.20687087953084227,
+     -0.22615160574983711,
+     -0.3705692438549698,
+     1.2655539189031886,
+     0.5121419609062415,
+     0.33114875356745466,
+     0.27309914488615333
+    ],
+    [
+     -0.4663289846734649,
+     0.4201713144516521,
+     -0.15926496136348894,
+     0.42017131445165484,
+     0.3963757697556996,
+     -0.0706673747699843,
+     -0.09208579689061125,
+     -0.292811818034487,
+     -0.17143449139749867,
+     -0.18494210228034552,
+     -0.4176570210757125,
+     -0.4539510697465593,
+     -0.5656450455181449,
+     -0.8924974712333678,
+     1.9890473805703457,
+     -0.10708556013916115,
+     0.1335647602899903,
+     -0.36842270986908265,
+     2.2541851226807994,
+     -0.1239678659570729,
+     -0.42052856501683095,
+     2.5065974449133117,
+     -0.3507252144432714,
+     -0.22480195079413248,
+     1.7553302369123147,
+     -0.14846954223119221,
+     -0.13405832242193289
+    ],
+    [
+     0.6305062268033316,
+     0.10045353015649261,
+     -0.0042948820136408696,
+     0.10045353015649523,
+     0.11405052834000115,
+     -0.18852418789406114,
+     -0.14745893005677457,
+     3.2387496866345895,
+     2.32689655361846,
+     -0.22376241370107147,
+     -0.1762007500222341,
+     0.009501607119102496,
+     -0.020932646510821204,
+     0.11002885951200472,
+     -0.00632095034088963,
+     0.09464639603722846,
+     0.16518462733322642,
+     -0.02215406522690244,
+     -0.1263636853260012,
+     -0.16616271202056623,
+     0.022075336744559373,
+     -0.015803560431276245,
+     0.06390611051992116,
+     -0.2003431605625767,
+     -0.11403823765205572,
+     -0.11989961275998785,
+     -0.1381793816086574
+    ],
+    [
+     -0.23173788932268718,
+     0.6334282206272962,
+     -0.41180146177550847,
+     0.6334282206272989,
+     0.6499800080752897,
+     0.16237782497043166,
+     0.14977619000905967,
+     -0.2375008846231286,
+     -0.1482251484589574,
+     -0.48084653329859806,
+     -0.4408938108727548,
+     0.001601502417954089,
+     -0.07896454158897462,
+     0.18223238898899907,
+     -0.02896555931509707,
+     0.16399826515787858,
+     0.5519512303295118,
+     -0.2486099183061267,
+     -0.029344614971609912,
+     -0.28065654884427554,
+     0.0918283660596165,
+     -0.07789825341666326,
+     0.27697109739581616,
+     -0.44962911038457165,
+     -0.37162543843224377,
+     0.16092644525090177,
+     -0.02428999295543296
+    ],
+    [
+     -0.14416140455936094,
+     -0.5793510019836042,
+     0.585048179189252,
+     -0.5793510019836017,
+     -0.5520636473123599,
+     -1.3916812947002304,
+     -1.6058011937214733,
+     -0.2780592116075966,
+     -0.1931446163246244,
+     -0.3533435113972042,
+     -0.3413133450507371,
+     -0.42374674104677096,
+     -0.39308200088684353,
+     -0.7718391056550945,
+     -0.4851013124469404,
+     -0.1451616321902693,
+     -1.3702232137974522,
+     -0.1919225709907895,
+     -0.26575960670846627,
+     5.218988082001844,
+     -0.31852310042922294,
+     -0.1577532927592593,
+     -0.9257545394512869,
+     0.42649754196186823,
+     0.34085732190239076,
+     -0.7060177992779758,
+     -0.38280657772710097
+    ],
+    [
+     0.42706416773267625,
+     -0.9510646877005626,
+     0.5619329848052848,
+     -0.9510646877005603,
+     -0.9601780664966955,
+     -0.5888640772638095,
+     -0.5414253696807513,
+     -0.1775795596660601,
+     -0.1739517105317278,
+     -0.258812820911772,
+     -0.21632350716567264,
+     0.17891782537993897,
+     0.2351078040051232,
+     0.39569138528943215,
+     -0.22378337094830925,
+     -0.044010368697496395,
+     -0.17334433278684738,
+     -0.11161999940089963,
+     -0.19299932614279175,
+     0.006268953049966579,
+     0.11840211546566894,
+     -0.15086249634234655,
+     0.0196897645979848,
+     -0.26480941374120726,
+     -0.18209311098271203,
+     -0.3371195133343476,
+     -0.07981739584663956
+    ]
+   ],
+   "feature_names": [
+    "n_ratings",
+    "avg_rating",
+    "std_rating",
+    "rating_bias",
+    "high_share",
+    "avg_movie_pop",
+    "share_top_pop",
+    "active_span_days",
+    "avg_gap_days",
+    "genre_share_action",
+    "genre_share_adventure",
+    "genre_share_animation",
+    "genre_share_childrens",
+    "genre_share_comedy",
+    "genre_share_crime",
+    "genre_share_documentary",
+    "genre_share_drama",
+    "genre_share_fantasy",
+    "genre_share_film-noir",
+    "genre_share_horror",
+    "genre_share_musical",
+    "genre_share_mystery",
+    "genre_share_romance",
+    "genre_share_sci-fi",
+    "genre_share_thriller",
+    "genre_share_war",
+    "genre_share_western"
+   ],
+   "metrics": {
+    "k_selected": 6,
+    "k_selection_rule": "对每个候选 k 在拟合集合上跑 kmeans++（确定性种子），按确定性抽样 800 人的轮廓系数估计选最大者（同分取较小 k）；选定 k 另在全体拟合用户上复算全量轮廓系数与 DBI；完整候选表写入 metrics.k_selection_table（验证期漂移对照见 validation_drift）",
+    "k_selection_table": [
+     {
+      "k": 2,
+      "silhouette_sampled": 0.10008942263866492,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 2.8124070375919357,
+      "sse": 117070.71595331468,
+      "iterations": 24,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     },
+     {
+      "k": 3,
+      "silhouette_sampled": 0.10618438319276172,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 2.3983623167232864,
+      "sse": 107503.67593770866,
+      "iterations": 26,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     },
+     {
+      "k": 4,
+      "silhouette_sampled": 0.10947843735606755,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 2.1103298154746617,
+      "sse": 100953.75669601813,
+      "iterations": 19,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     },
+     {
+      "k": 5,
+      "silhouette_sampled": 0.11273256698823797,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 2.0101304952136863,
+      "sse": 96417.32798874013,
+      "iterations": 19,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     },
+     {
+      "k": 6,
+      "silhouette_sampled": 0.11849724792276323,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 1.934505468620653,
+      "sse": 94764.74760230673,
+      "iterations": 23,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     },
+     {
+      "k": 7,
+      "silhouette_sampled": 0.09123312708642067,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 1.9358635559270916,
+      "sse": 92269.50502618117,
+      "iterations": 32,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     },
+     {
+      "k": 8,
+      "silhouette_sampled": 0.09199368449298082,
+      "silhouette_basis": "sample_800_seed_42",
+      "davies_bouldin": 2.0440440216358384,
+      "sse": 88406.14882833573,
+      "iterations": 34,
+      "converged": true,
+      "empty_cluster_fixes": 0
+     }
+    ],
+    "silhouette_full": 0.11986815299158322,
+    "silhouette_per_cluster_full": {
+     "0": 0.11570684576329719,
+     "1": -0.018120752442607444,
+     "2": 0.11322249902529957,
+     "3": 0.14607186492783514,
+     "4": 0.2599178893244597,
+     "5": 0.10355061180252068
+    },
+    "davies_bouldin_full": 1.934505468620653,
+    "sse_full": 94764.74760230673,
+    "n_fit_users": 4783,
+    "n_non_fit_reference": 0,
+    "definition": {
+     "silhouette": "轮廓系数 mean((b-a)/max(a,b))；a=同簇其他样本平均距离，b=最近异簇平均距离；范围[-1,1]，越高越好；孤立样本 s 记 0；簇数<2 时为 null。",
+     "davies_bouldin": "DBI = mean_k max_j≠k (scatter_k+scatter_j)/dist(c_k,c_j)，scatter 为簇内到质心平均距离；越低越好；仅硬划分适用，噪声点不参与；簇数<2 或质心重合时为 null。",
+     "sse": "簇内平方误差和（到质心距离平方和）；噪声点不计；仅对质心型算法有意义。",
+     "k_selection_table": "每个候选 k 在拟合集合上实际计算的 SSE/轮廓系数/DBI。"
+    }
+   },
+   "assignments": [
+    {
+     "user_id": 1161,
+     "cluster_id": 3,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "distance_to_centroid": 2.676182423075604
+    },
+    {
+     "user_id": 1162,
+     "cluster_id": 3,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "distance_to_centroid": 4.602098207047359
+    },
+    {
+     "user_id": 1163,
+     "cluster_id": 0,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "distance_to_centroid": 4.418575435034006
+    },
+    {
+     "user_id": 1000,
+     "cluster_id": null,
+     "status": "NO_TRAIN_HISTORY",
+     "reliability_low": true,
+     "distance_to_centroid": null,
+     "note": "训练期(Timestamp<=T1)无任何评分记录，无法构造画像向量"
+    }
+   ],
+   "cluster_summaries": [
+    {
+     "cluster_id": 0,
+     "size": 977,
+     "avg_rating_mean": 3.7609131766634336,
+     "n_ratings_mean": 104.10951893551689,
+     "high_share_mean": 0.6417756837710789,
+     "active_span_days_mean": 3.516365089180788,
+     "top_genre_shares": [
+      {
+       "genre": "action",
+       "v": 0.5170231623498545
+      },
+      {
+       "genre": "sci-fi",
+       "v": 0.36912195460361413
+      },
+      {
+       "genre": "adventure",
+       "v": 0.2726750216191543
+      }
+     ],
+     "representative_movies": [
+      {
+       "movie_id": 260,
+       "title": "Star Wars: Episode IV - A New Hope (1977)",
+       "year": 1977,
+       "high_raters_in_cluster": 682
+      },
+      {
+       "movie_id": 1196,
+       "title": "Star Wars: Episode V - The Empire Strikes Back (1980)",
+       "year": 1980,
+       "high_raters_in_cluster": 606
+      },
+      {
+       "movie_id": 2571,
+       "title": "Matrix, The (1999)",
+       "year": 1999,
+       "high_raters_in_cluster": 592
+      }
+     ],
+     "summary_basis": "均值与计数均为群内真实统计；代表性内容为群成员训练期评分>=4 的人数（>= 3 人）"
+    },
+    {
+     "cluster_id": 1,
+     "size": 235,
+     "avg_rating_mean": 3.8903323306883553,
+     "n_ratings_mean": 68.67659574468085,
+     "high_share_mean": 0.6911492880385036,
+     "active_span_days_mean": 1.861124852245863,
+     "top_genre_shares": [
+      {
+       "genre": "thriller",
+       "v": 0.3936461042717192
+      },
+      {
+       "genre": "drama",
+       "v": 0.38906513756964506
+      },
+      {
+       "genre": "action",
+       "v": 0.23088949394959457
+      }
+     ],
+     "representative_movies": [
+      {
+       "movie_id": 1617,
+       "title": "L.A. Confidential (1997)",
+       "year": 1997,
+       "high_raters_in_cluster": 156
+      },
+      {
+       "movie_id": 1252,
+       "title": "Chinatown (1974)",
+       "year": 1974,
+       "high_raters_in_cluster": 104
+      },
+      {
+       "movie_id": 50,
+       "title": "Usual Suspects, The (1995)",
+       "year": 1995,
+       "high_raters_in_cluster": 98
+      },
+      {
+       "movie_id": 608,
+       "title": "Fargo (1996)",
+       "year": 1996,
+       "high_raters_in_cluster": 94
+      },
+      {
+       "movie_id": 593,
+       "title": "Silence of the Lambs, The (1991)",
+       "year": 1991,
+       "high_raters_in_cluster": 82
+      }
+     ],
+     "summary_basis": "均值与计数均为群内真实统计；代表性内容为群成员训练期评分>=4 的人数（>= 3 人）"
+    }
+   ],
+   "limitations": [
+    "K-Means 假设簇为凸形且大小相近，对非凸密度结构不适用；结果对初始点敏感，本实现以固定种子(42)的 kmeans++ 保证可复现。",
+    "特征只用训练期(Timestamp<=T1)行为统计与类型占比；未纳入人口学属性（迭代一已确认其可信性局限，见 analysis.json feature_dict._excluded）。",
+    "历史不足用户(训练期评分 < min_train_ratings)的簇归属仅为\"最近质心参考\"，可靠性低(reliability_low=true)，不构成对其群体的结论。",
+    "候选 k 的轮廓系数按 800 人确定性抽样估计（全量 O(n²) 代价过高），选定 k 后在全体拟合用户上复算；两者均写入 metrics。",
+    "18 个类型占比之和恒为 1（多标签影片计入每个类型），该组维度存在线性冗余，有效自由度为 17；这是登记的特征工程选择，不是缺陷掩盖。",
+    "训练期有 13 个评分用户不在 users.dat（迭代一孤儿引用），未纳入画像与拟合域，详见画像 meta.orphan_user_ids。"
+   ],
+   "algorithm_source": "经典划分聚类；课程 PPT 章节/页码待团队核对后登记（不得凭惯例声称）",
+   "elapsed_ms": 43868,
+   "_execution": {
+    "mode": "subprocess",
+    "attempt": 1,
+    "wall_ms": 43917
+   }
+  }
+ ]
+}

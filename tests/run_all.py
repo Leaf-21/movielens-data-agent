@@ -81,26 +81,48 @@ def run_python_unittest(start_dir):
     return total, bad, '\n'.join(outputs)
 
 
-def run_node_frontend():
-    """运行前端渲染逻辑测试（Node）。"""
-    script = os.path.join(HERE, 'frontend', 'test_render.mjs')
-    if not os.path.exists(script):
-        return 0, 0, '（无前端 Node 用例）'
-    code, out = _run_subprocess(['node', script], cwd=REPO)
-    # 前端脚本用退出码表示成败；从输出里取通过/失败数
-    passed = failed = 0
+def _parse_node_counts(out):
+    """从 Node 测试输出的 "结果：X 通过, Y 失败" 行取 (通过, 失败)。"""
+    import re
     for line in out.splitlines():
         if line.startswith('结果：'):
-            try:
-                part = line.replace('结果：', '').replace('通过', '').replace('失败', '')
-                nums = [int(x) for x in __import__('re').findall(r'\d+', line)]
-                if len(nums) >= 2:
-                    passed, failed = nums[0], nums[1]
-            except Exception:
-                pass
-    if code != 0 and failed == 0:
-        failed = 1  # 非零退出但未解析到，保守记 1 失败
-    return passed + failed, failed, out
+            nums = [int(x) for x in re.findall(r'\d+', line)]
+            if len(nums) >= 2:
+                return nums[0], nums[1]
+    return None
+
+
+def run_node_frontend():
+    """运行前端全部 Node 用例。
+
+    包括：
+      · test_render.mjs          —— 构造数据驱动的渲染逻辑单测
+      · test_render_contract.mjs —— 真实任务字段驱动的契约测试
+        （防止"字段错配但单测仍全绿"再次发生，见 前端问题修复清单）
+    """
+    scripts = ['test_render.mjs', 'test_render_contract.mjs']
+    total = failed = 0
+    outputs = []
+    found = False
+    for name in scripts:
+        script = os.path.join(HERE, 'frontend', name)
+        if not os.path.exists(script):
+            continue
+        found = True
+        code, out = _run_subprocess(['node', script], cwd=REPO)
+        outputs.append('--- %s ---\n%s' % (name, out))
+        counts = _parse_node_counts(out)
+        if counts is None:
+            total += 1
+            failed += 1  # 非零退出/无汇总行，保守记 1 失败
+        else:
+            total += counts[0] + counts[1]
+            failed += counts[1]
+            if code != 0 and counts[1] == 0:
+                failed += 1
+    if not found:
+        return 0, 0, '（无前端 Node 用例）'
+    return total, failed, '\n'.join(outputs)
 
 
 def main():

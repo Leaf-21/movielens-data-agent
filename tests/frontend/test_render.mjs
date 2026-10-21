@@ -247,32 +247,43 @@ test('降维结果渲染实际坐标、图例、指标和版本', () => {
 });
 
 test('分类和聚类分析结果字段可展示', () => {
+  // 注意：真实信封里没有 cluster_summaries[].summary，群体摘要由统计字段拼装，
+  // assignments 也没有 is_noise 字段（噪声/未归属由 status 判定）。
+  // 真实字段驱动的契约测试见 tests/frontend/test_render_contract.mjs。
   Render.analysis({
     task_type: 'classification', data_version: 'd', profile_version: 'p',
     status: 'SUCCESS',
     results: [{
       algorithm_name: 'Gaussian NB', algorithm_tool: 'classification_gaussian_nb',
       model_version: 'm', result_version: 'r', parameters: {},
-      target: { user_id: 7, movie_id: 8 }, metrics: { test_f1: 0.5 },
-      results: [{ predicted_class: 'HIGH_RATING',
-        positive_probability: 0.7, decision_score: 0.7 }]
+      target: { user_id: 7, movie_id: 8 },
+      results: [{ predicted_class: 'HIGH_RATING', positive_probability: 0.7,
+        decision_score: 0.7, metrics: { threshold: 0.5, test_roc_auc: 0.9 } }]
     }]
   });
-  assert.ok(document.querySelector('#analysisResults').innerHTML.includes('HIGH_RATING'));
+  const clsHtml = document.querySelector('#analysisResults').innerHTML;
+  assert.ok(clsHtml.includes('HIGH_RATING'));
+  assert.ok(clsHtml.includes('决策阈值'), '评价指标应表格化');
+  assert.ok(!clsHtml.includes('{"threshold"'), '不得输出原始 JSON');
   Render.analysis({
     task_type: 'clustering', data_version: 'd', profile_version: 'p',
     status: 'SUCCESS',
     results: [{
       algorithm_name: 'K-Means', algorithm_tool: 'clustering_kmeans',
       model_version: 'm', result_version: 'r', parameters: {},
-      metrics: { silhouette: 0.2 },
-      assignments: [{ user_id: 7, cluster_id: 1, is_noise: false }],
-      cluster_summaries: [{ cluster_id: 1, size: 1, summary: '测试摘要' }]
+      metrics: { silhouette_full: 0.2 },
+      assignments: [{ user_id: 7, cluster_id: 1, status: 'SUCCESS', reliability_low: false }],
+      cluster_summaries: [{ cluster_id: 1, size: 1, avg_rating_mean: 3.5,
+        top_genre_shares: [{ genre: 'drama', v: 0.6 }],
+        representative_movies: [{ title: '示例影片 (1999)', year: 1999,
+          high_raters_in_cluster: 3 }],
+        summary_basis: '真实统计口径' }]
     }]
   });
   const html = document.querySelector('#analysisResults').innerHTML;
-  assert.ok(html.includes('测试摘要'));
-  assert.ok(html.includes('silhouette'));
+  assert.ok(html.includes('示例影片'), '代表性作品应渲染');
+  assert.ok(html.includes('真实统计口径'), 'summary_basis 应可见');
+  assert.ok(html.includes('全量轮廓系数'));
 });
 
 console.log(`\n结果：${passed} 通过, ${failed} 失败`);

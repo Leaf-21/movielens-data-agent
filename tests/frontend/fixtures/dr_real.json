@@ -1,0 +1,386 @@
+{
+ "task_id": "task_20261020_0045",
+ "task_type": "dimensionality_reduction",
+ "status": "SUCCESS",
+ "analysis_version": "iter2-analysis-v1",
+ "data_version": "movielens-1m-v2-clean-v1",
+ "profile_version": "profile-v1",
+ "T1": "2000-11-22",
+ "T2": "2000-12-10",
+ "T1_epoch": 974862386,
+ "T2_epoch": 976422054,
+ "requested_user_ids": null,
+ "result_versions": {
+  "dimensionality_reduction_pca": "drres-4071fbbbdc52"
+ },
+ "code_version": "3c7c210",
+ "understanding": "未指定用户集合，使用已登记的拟合画像用户",
+ "execution": {
+  "mode": "subprocess_isolated",
+  "total_wall_ms": 38938,
+  "log": [
+   "pca 第1次尝试成功(38873ms)"
+  ]
+ },
+ "created_at": "2026-10-20T16:15:19Z",
+ "_assembled_by": "agent/analysis(成员B)",
+ "results": [
+  {
+   "algorithm": "pca",
+   "algorithm_name": "Principal Component Analysis (协方差矩阵 + 对称特征分解)",
+   "algorithm_tool": "dimensionality_reduction_pca",
+   "algorithm_source": "PCA 标准定义：协方差矩阵前 d 个特征向量；课程 PPT 章节/页码尚未核实",
+   "model_version": "dr-3de89cb741",
+   "result_version": "drres-4071fbbbdc52",
+   "parameters": {
+    "target_dimensions": 2,
+    "information_retention_threshold": 0.8,
+    "clustering_k": 6,
+    "clustering_seed": 42,
+    "timeout_s": 600
+   },
+   "data_version": "movielens-1m-v2-clean-v1",
+   "profile_version": "profile-v1",
+   "feature_version": "profile-v1",
+   "T1": 974862386,
+   "T2": 976422054,
+   "code_version": "3c7c210",
+   "created_at": "2026-10-20T16:16:30Z",
+   "original_dimensions": 27,
+   "reduced_dimensions": 2,
+   "axis_meaning": {
+    "x": "第1主成分（线性组合，方差最大方向；方差来自画像 z-score 空间）",
+    "y": "第2主成分（与第1主成分正交，解释剩余方差最大方向）",
+    "loadings": [
+     {
+      "component": "PC1",
+      "explained_variance_ratio": 0.14970352460358308,
+      "top_features": [
+       {
+        "feature": "rating_bias",
+        "loading": 0.408459571956081
+       },
+       {
+        "feature": "avg_rating",
+        "loading": 0.4084595719560805
+       },
+       {
+        "feature": "high_share",
+        "loading": 0.3977146437613344
+       },
+       {
+        "feature": "avg_movie_pop",
+        "loading": 0.3236317934822637
+       },
+       {
+        "feature": "share_top_pop",
+        "loading": 0.3055802668611284
+       }
+      ]
+     },
+     {
+      "component": "PC2",
+      "explained_variance_ratio": 0.13685419462565046,
+      "top_features": [
+       {
+        "feature": "genre_share_action",
+        "loading": 0.4083706188548545
+       },
+       {
+        "feature": "genre_share_sci-fi",
+        "loading": 0.39765480712452056
+       },
+       {
+        "feature": "genre_share_adventure",
+        "loading": 0.39276091687882786
+       },
+       {
+        "feature": "genre_share_drama",
+        "loading": -0.3259250428527633
+       },
+       {
+        "feature": "genre_share_thriller",
+        "loading": 0.23272830905288575
+       }
+      ]
+     }
+    ]
+   },
+   "fit_scope": {
+    "population": "profile-v1 中 status=OK 的训练期画像用户（Timestamp<=T1）",
+    "n_fit_users": 4783,
+    "original_dimensions": 27,
+    "projected_out_of_sample": 0,
+    "missing_user_ids": []
+   },
+   "information_retention": {
+    "metric": "explained_variance_ratio",
+    "explained_variance_ratio": [
+     0.14970352460358308,
+     0.13685419462565046,
+     0.11449810669047311,
+     0.06863626708014009,
+     0.061226317237837315,
+     0.055754775606175776,
+     0.048591879798838944,
+     0.04227877427305773,
+     0.03664383632126937,
+     0.0364692322979831
+    ],
+    "cumulative_explained_variance": [
+     0.14970352460358308,
+     0.28655771922923357,
+     0.4010558259197067,
+     0.46969209299984677,
+     0.530918410237684,
+     0.5866731858438599,
+     0.6352650656426988,
+     0.6775438399157565,
+     0.7141876762370258,
+     0.750656908535009
+    ],
+    "top2_cumulative": 0.28655771922923357,
+    "dimensions_for_threshold": 12,
+    "threshold": 0.8,
+    "eigenvalues_top10": [
+     4.042840416317708,
+     3.6958359573716204,
+     3.09209535677841,
+     1.853566743412035,
+     1.6534562598100233,
+     1.505693742483716,
+     1.3122551127356434,
+     1.1417656186526424,
+     0.9895904781189957,
+     0.9848751836457185
+    ],
+    "zero_variance_directions": 1,
+    "sign_convention": "每个主成分内 |载荷| 最大的特征载荷取正号（确定性符号规范化），保证同一数据/实现下坐标逐位可复现",
+    "definition": "解释方差比 = 第 i 个特征值 / 全部特征值之和（协方差矩阵，样本自由度 n-1）；累计解释方差 = 前 d 个之比和。"
+   },
+   "resource_usage": {
+    "elapsed_ms": 38788,
+    "peak_alloc_bytes": 23927752,
+    "memory_method": "tracemalloc 进程内峰值（仅计 Python 分配，不含解释器/Numpy C 分配）",
+    "n_fit": 4783,
+    "n_features": 27
+   },
+   "coordinates": [
+    {
+     "user_id": 1161,
+     "x": -0.14703243756621473,
+     "y": -0.2166382540441364,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1162,
+     "x": 0.12945219388613954,
+     "y": -2.3758495477734214,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1163,
+     "x": 1.966285606617545,
+     "y": 3.3804846786159604,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1164,
+     "x": -1.2847100929185429,
+     "y": -3.819079582356027,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1166,
+     "x": 0.8071501732194934,
+     "y": 0.7789918280994472,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1167,
+     "x": 0.7041630633101965,
+     "y": -0.1607331063063928,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1168,
+     "x": 0.3507141085112837,
+     "y": -0.6343149356496436,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1169,
+     "x": -4.667526851086157,
+     "y": -0.6837965257783266,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1170,
+     "x": 0.15127897370483262,
+     "y": -2.3665900192986635,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1171,
+     "x": 1.0079791657210209,
+     "y": -0.5589580051994066,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1172,
+     "x": 1.8955521063995986,
+     "y": -0.19298896961698694,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1173,
+     "x": -2.427652852222508,
+     "y": -1.5314506566380255,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1174,
+     "x": -2.5365391214558173,
+     "y": 0.00041139141341700494,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1175,
+     "x": -0.2391306466348556,
+     "y": -4.397740690514531,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1176,
+     "x": 2.507635467960057,
+     "y": 1.4355675028987163,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1177,
+     "x": 0.9796060884670965,
+     "y": -1.2488811856528808,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1178,
+     "x": 0.0369678400853694,
+     "y": -1.0319531077249284,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1179,
+     "x": 2.2238290874110946,
+     "y": 3.538507164981262,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1180,
+     "x": 4.333137611768542,
+     "y": -1.3796169305541217,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    },
+    {
+     "user_id": 1181,
+     "x": -2.0434368161003644,
+     "y": 3.6865962587589434,
+     "status": "SUCCESS",
+     "reliability_low": false,
+     "is_fit_user": true
+    }
+   ],
+   "clustering_comparison": {
+    "kmeans": {
+     "algorithm": "kmeans",
+     "algorithm_tool": "clustering_kmeans",
+     "parameters": {
+      "k": 6,
+      "seed": 42,
+      "max_iter": 100,
+      "tol": 1e-06,
+      "init": "kmeans++"
+     },
+     "same_user_set": true,
+     "before": {
+      "dimensions": 27,
+      "metrics": {
+       "silhouette": 0.11986815299158322,
+       "davies_bouldin": 1.934505468620653,
+       "sse": 94764.74760230673
+      }
+     },
+     "after": {
+      "dimensions": 2,
+      "metrics": {
+       "silhouette": 0.33760596515084806,
+       "davies_bouldin": 0.8781357649694561,
+       "sse": 8816.133128219919
+      }
+     },
+     "delta": {
+      "silhouette": 0.21773781215926485,
+      "davies_bouldin": -1.056369703651197,
+      "sse": -85948.6144740868
+     },
+     "metric_definitions": {
+      "silhouette": "轮廓系数 mean((b-a)/max(a,b))；a=同簇其他样本平均距离，b=最近异簇平均距离；范围[-1,1]，越高越好；孤立样本 s 记 0；簇数<2 时为 null。",
+      "davies_bouldin": "DBI = mean_k max_j≠k (scatter_k+scatter_j)/dist(c_k,c_j)，scatter 为簇内到质心平均距离；越低越好；仅硬划分适用，噪声点不参与；簇数<2 或质心重合时为 null。",
+      "sse": "簇内平方误差和（到质心距离平方和）；噪声点不计；仅对质心型算法有意义。"
+     },
+     "comparability_note": "降维前后使用完全相同的用户集合与同一聚类算法/k 值；SSE 在降维空间天然更小，不能跨空间直接比较绝对大小，应以轮廓系数与 DBI（无量纲）为主要参照。"
+    }
+   },
+   "limitations": [
+    "PCA 是线性方法：只捕获特征空间的线性方差结构，非线性簇结构（如类别占比的条件关系）不会被主成分显式建模。",
+    "画像 18 个类型占比之和恒为 1，该组维度线性冗余（有效自由度 17），PCA 会把冗余反映到零方差方向上（解释方差比≈0），不视为信息丢失。",
+    "主成分轴的\"意义\"是载荷线性组合：具体语义需查看 loadings，不能直接用原特征名命名；二维图只用于观察结构，不能仅凭视觉分离宣称更优。",
+    "降维前后聚类对照使用同一用户集合与同一 K-Means 实现/k 值；SSE 在低维空间天然更小，跨空间比较应以轮廓系数与 DBI（无量纲）为准。",
+    "降维模型只在 profile-v1 的拟合用户（训练期画像 OK 用户）上拟合；历史不足/无训练记录用户为样本外投影，可靠性低(reliability_low=true)，不得据此下群体结论。",
+    "二维图只用于观察结构，不能仅凭视觉分离宣称算法更优（数据与实验规范 §五.6）；优劣结论必须同时参考 clustering_comparison 的指标。"
+   ],
+   "_execution": {
+    "mode": "subprocess",
+    "attempt": 1,
+    "wall_ms": 38873
+   }
+  }
+ ]
+}

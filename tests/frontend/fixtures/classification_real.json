@@ -1,0 +1,84 @@
+{
+ "task_type": "classification",
+ "status": "SUCCESS",
+ "algorithm": "gnb",
+ "algorithm_name": "Gaussian Naive Bayes",
+ "algorithm_tool": "classification_gnb",
+ "algorithm_source": "课程课件 26Fall-008-分类1010+1014.pdf 第 25–36 页（朴素贝叶斯）",
+ "model_version": "gnb-20261019",
+ "result_version": "cls-e4bc69a2d279",
+ "parameters": {
+  "var_smoothing": 1e-09
+ },
+ "data_version": "movielens-1m-v2-clean-v1",
+ "profile_version": "profile-v1",
+ "cleaning_rule_version": "rule-v2",
+ "feature_version": "feat-v1",
+ "split_version": "split-v1",
+ "T1": 974862386,
+ "T2": 976422054,
+ "code_version": "b0e803e",
+ "created_at": "2026-10-21T09:32:13",
+ "target": {
+  "user_id": 1,
+  "movie_id": 1193
+ },
+ "prediction_time_basis": "train_snapshot(T1=974862386)",
+ "results": [
+  {
+   "algorithm": "Gaussian Naive Bayes",
+   "algorithm_slug": "gnb",
+   "model_version": "gnb-20261019",
+   "predicted_class": "HIGH_RATING",
+   "positive_probability": 0.82865,
+   "decision_score": 0.82865,
+   "score_type": "positive_probability",
+   "parameters": {
+    "var_smoothing": 1e-09
+   },
+   "metrics": {
+    "threshold": 0.42051,
+    "valid_roc_auc": 0.68383,
+    "valid_pr_auc": 0.705888,
+    "test_roc_auc": 0.683838,
+    "test_pr_auc": 0.694191
+   },
+   "limitations": [
+    "概率未经校准，不能当作真实概率直接展示；决策阈值在验证期选定。",
+    "用户或电影在训练期历史不足时，相关特征回退到训练期全局均分，预测可信度下降。",
+    "模型只使用 T1 之前的数据训练，不反映 T1 之后的偏好变化。",
+    "用户或电影历史不足，相关特征使用训练期全局均分回退"
+   ],
+   "features_used": {
+    "user_mean": 3.6019,
+    "user_history_count": 0,
+    "user_mean_source": "fallback_global_mean",
+    "movie_mean": 4.4116,
+    "movie_history_count": 1278,
+    "movie_mean_source": "history",
+    "genres": [
+     "Drama"
+    ],
+    "occupation": 10,
+    "age": 1,
+    "has_user_attrs": true
+   },
+   "prediction_time_basis": "train_snapshot(T1=974862386)"
+  }
+ ],
+ "metrics": {
+  "threshold": 0.42051,
+  "valid_roc_auc": 0.68383,
+  "valid_pr_auc": 0.705888,
+  "test_roc_auc": 0.683838,
+  "test_pr_auc": 0.694191
+ },
+ "limitations": [
+  "概率未经校准，不能当作真实概率直接展示；决策阈值在验证期选定。",
+  "用户或电影在训练期历史不足时，相关特征回退到训练期全局均分，预测可信度下降。",
+  "模型只使用 T1 之前的数据训练，不反映 T1 之后的偏好变化。",
+  "用户或电影历史不足，相关特征使用训练期全局均分回退"
+ ],
+ "elapsed_ms": 1290,
+ "_note": "真实运行输出（docs/迭代二/交付/分类结果样例.json），已裁剪为单算法样例"
+}
